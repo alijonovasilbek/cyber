@@ -1,0 +1,893 @@
+openapi: 3.0.3
+info:
+  title: CyberGuard API
+  version: 1.0.0
+  description: CyberGuard demo backend API documentation.
+paths:
+  /api/analyze/:
+    post:
+      operationId: analyze_create
+      tags:
+      - Analysis
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponse'
+          description: ''
+  /api/blocked/:
+    get:
+      operationId: blocked_list
+      tags:
+      - blocked
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlockedIP'
+          description: ''
+    post:
+      operationId: blocked_create
+      tags:
+      - blocked
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockedIP'
+          description: ''
+  /api/blocked/{id}/:
+    get:
+      operationId: blocked_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blocked ip.
+        required: true
+      tags:
+      - blocked
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockedIP'
+          description: ''
+    put:
+      operationId: blocked_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blocked ip.
+        required: true
+      tags:
+      - blocked
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlockedIP'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockedIP'
+          description: ''
+    patch:
+      operationId: blocked_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blocked ip.
+        required: true
+      tags:
+      - blocked
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBlockedIP'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBlockedIP'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBlockedIP'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockedIP'
+          description: ''
+    delete:
+      operationId: blocked_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this blocked ip.
+        required: true
+      tags:
+      - blocked
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/dashboard/:
+    get:
+      operationId: dashboard_retrieve
+      tags:
+      - Dashboard
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+          description: ''
+  /api/logs/live/:
+    get:
+      operationId: logs_live_retrieve
+      tags:
+      - Logs
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveLogsResponse'
+          description: ''
+  /api/network/scan/:
+    get:
+      operationId: network_scan_retrieve
+      tags:
+      - Network
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkScanResponse'
+          description: ''
+  /api/reputation/{ip}/:
+    get:
+      operationId: reputation_retrieve
+      parameters:
+      - in: path
+        name: ip
+        schema:
+          type: string
+        description: Tekshiriladigan IP manzil
+        required: true
+      tags:
+      - Reputation
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IPReputation'
+          description: ''
+  /api/threats/:
+    get:
+      operationId: threats_list
+      tags:
+      - threats
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ThreatLog'
+          description: ''
+    post:
+      operationId: threats_create
+      tags:
+      - threats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLog'
+          description: ''
+  /api/threats/{id}/:
+    get:
+      operationId: threats_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this threat log.
+        required: true
+      tags:
+      - threats
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLog'
+          description: ''
+    put:
+      operationId: threats_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this threat log.
+        required: true
+      tags:
+      - threats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLog'
+          description: ''
+    patch:
+      operationId: threats_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this threat log.
+        required: true
+      tags:
+      - threats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedThreatLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedThreatLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedThreatLog'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLog'
+          description: ''
+    delete:
+      operationId: threats_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this threat log.
+        required: true
+      tags:
+      - threats
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/threats/{id}/block/:
+    post:
+      operationId: threats_block_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this threat log.
+        required: true
+      tags:
+      - threats
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ThreatLog'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatLog'
+          description: ''
+components:
+  schemas:
+    AnalyzeRequest:
+      type: object
+      properties:
+        ip_address:
+          type: string
+        threat_type:
+          $ref: '#/components/schemas/AnalyzeRequestThreatTypeEnum'
+        algorithms:
+          type: array
+          items:
+            type: string
+          default:
+          - Random Forest
+          - XGBoost
+        context:
+          type: string
+          default: ''
+      required:
+      - ip_address
+      - threat_type
+    AnalyzeRequestThreatTypeEnum:
+      enum:
+      - ddos
+      - sqli
+      - brute_force
+      - phishing
+      - ransomware
+      - mitm
+      - apt
+      - port_scan
+      - zero_day
+      type: string
+      description: |-
+        * `ddos` - ddos
+        * `sqli` - sqli
+        * `brute_force` - brute_force
+        * `phishing` - phishing
+        * `ransomware` - ransomware
+        * `mitm` - mitm
+        * `apt` - apt
+        * `port_scan` - port_scan
+        * `zero_day` - zero_day
+    AnalyzeResponse:
+      type: object
+      properties:
+        ip:
+          type: string
+        ip_info:
+          $ref: '#/components/schemas/IPInfo'
+        threat_type:
+          type: string
+        threat_name:
+          type: string
+        probability:
+          type: number
+          format: double
+        probability_pct:
+          type: string
+        severity:
+          type: string
+        indicators:
+          type: array
+          items:
+            type: string
+        mitigation:
+          type: array
+          items:
+            type: string
+        algorithm_scores:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        local_context:
+          type: string
+        context:
+          type: string
+        recommendation:
+          type: string
+        log_id:
+          type: integer
+        telemetry:
+          type: object
+          additionalProperties: {}
+        model_version:
+          type: string
+      required:
+      - algorithm_scores
+      - context
+      - indicators
+      - ip
+      - ip_info
+      - local_context
+      - mitigation
+      - probability
+      - probability_pct
+      - recommendation
+      - severity
+      - threat_name
+      - threat_type
+    BlockedIP:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ip_address:
+          type: string
+        reason:
+          type: string
+        blocked_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_active:
+          type: boolean
+      required:
+      - blocked_at
+      - id
+      - ip_address
+      - reason
+    DashboardStats:
+      type: object
+      properties:
+        total_threats:
+          type: integer
+        blocked:
+          type: integer
+        critical:
+          type: integer
+        block_rate:
+          type: number
+          format: double
+        accuracy:
+          type: number
+          format: double
+        f1_score:
+          type: number
+          format: double
+        response_ms:
+          type: integer
+        false_positive_rate:
+          type: number
+          format: double
+        hourly_trend:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardTrendPoint'
+      required:
+      - accuracy
+      - block_rate
+      - blocked
+      - critical
+      - f1_score
+      - false_positive_rate
+      - hourly_trend
+      - response_ms
+      - total_threats
+    DashboardTrendPoint:
+      type: object
+      properties:
+        hour:
+          type: string
+        threats:
+          type: integer
+        blocked:
+          type: integer
+      required:
+      - blocked
+      - hour
+      - threats
+    IPInfo:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        ip:
+          type: string
+        is_local:
+          type: boolean
+        is_loopback:
+          type: boolean
+        network_type:
+          type: string
+        device_name:
+          type: string
+        mac_address:
+          type: string
+        known_risk:
+          type: string
+      required:
+      - device_name
+      - ip
+      - is_local
+      - is_loopback
+      - known_risk
+      - mac_address
+      - network_type
+      - valid
+    IPReputation:
+      type: object
+      properties:
+        ip:
+          type: string
+        is_local:
+          type: boolean
+        message:
+          type: string
+        local_info:
+          $ref: '#/components/schemas/IPInfo'
+        abuse_score:
+          type: integer
+        demo_abuse_score:
+          type: integer
+        reports:
+          type: integer
+        country:
+          type: string
+        isp:
+          type: string
+        domain:
+          type: string
+        last_reported:
+          type: string
+      required:
+      - ip
+      - is_local
+    LiveLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        level:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        ip:
+          type: string
+      required:
+      - id
+      - ip
+      - level
+      - message
+      - timestamp
+    LiveLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LiveLogEntry'
+      required:
+      - logs
+    NetworkScanDevice:
+      type: object
+      properties:
+        ip:
+          type: string
+        name:
+          type: string
+        mac:
+          type: string
+        risk:
+          type: string
+        network_type:
+          type: string
+        status:
+          type: string
+        open_ports:
+          type: array
+          items:
+            type: integer
+        last_seen:
+          type: string
+          format: date-time
+        source:
+          type: string
+      required:
+      - ip
+      - last_seen
+      - mac
+      - name
+      - network_type
+      - open_ports
+      - risk
+      - status
+    NetworkScanResponse:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkScanDevice'
+        total:
+          type: integer
+      required:
+      - devices
+      - total
+    PatchedBlockedIP:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ip_address:
+          type: string
+        reason:
+          type: string
+        blocked_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_active:
+          type: boolean
+    PatchedThreatLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        severity_display:
+          type: string
+          readOnly: true
+        threat_display:
+          type: string
+          readOnly: true
+        ip_address:
+          type: string
+        threat_type:
+          $ref: '#/components/schemas/ThreatLogThreatTypeEnum'
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        probability:
+          type: number
+          format: double
+        description:
+          type: string
+        is_blocked:
+          type: boolean
+        is_local:
+          type: boolean
+        device_name:
+          type: string
+          maxLength: 100
+        algorithm:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        raw_data: {}
+    SeverityEnum:
+      enum:
+      - critical
+      - high
+      - medium
+      - low
+      type: string
+      description: |-
+        * `critical` - Kritik
+        * `high` - Yuqori
+        * `medium` - O'rta
+        * `low` - Past
+    ThreatLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        severity_display:
+          type: string
+          readOnly: true
+        threat_display:
+          type: string
+          readOnly: true
+        ip_address:
+          type: string
+        threat_type:
+          $ref: '#/components/schemas/ThreatLogThreatTypeEnum'
+        severity:
+          $ref: '#/components/schemas/SeverityEnum'
+        probability:
+          type: number
+          format: double
+        description:
+          type: string
+        is_blocked:
+          type: boolean
+        is_local:
+          type: boolean
+        device_name:
+          type: string
+          maxLength: 100
+        algorithm:
+          type: string
+          maxLength: 100
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        raw_data: {}
+      required:
+      - created_at
+      - id
+      - ip_address
+      - severity
+      - severity_display
+      - threat_display
+      - threat_type
+    ThreatLogThreatTypeEnum:
+      enum:
+      - ddos
+      - sqli
+      - brute_force
+      - phishing
+      - ransomware
+      - mitm
+      - zero_day
+      - apt
+      - port_scan
+      - anomaly
+      type: string
+      description: |-
+        * `ddos` - DDoS
+        * `sqli` - SQL Injection
+        * `brute_force` - Brute Force
+        * `phishing` - Phishing
+        * `ransomware` - Ransomware
+        * `mitm` - MITM
+        * `zero_day` - Zero-Day
+        * `apt` - APT
+        * `port_scan` - Port Scan
+        * `anomaly` - Anomaliya
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

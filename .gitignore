@@ -4,10 +4,35 @@ __pycache__/
 *.pyd
 .env
 venv/
+.venv/
+backend/.venv/
 env/
 db.sqlite3
 node_modules/
+frontend/node_modules/
 dist/
 build/
 .DS_Store
 *.egg-info/
+.claude/
+query
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node
+node_modules/
+.npm-cache/
+.cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store

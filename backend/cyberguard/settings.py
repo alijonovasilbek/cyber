@@ -29,18 +29,38 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'cyberguard.urls'
+ASGI_APPLICATION = 'cyberguard.asgi.application'
 TEMPLATES = [{'BACKEND': 'django.template.backends.django.DjangoTemplates', 'DIRS': [], 'APP_DIRS': True, 'OPTIONS': {'context_processors': ['django.template.context_processors.request', 'django.contrib.auth.context_processors.auth', 'django.contrib.messages.context_processors.messages']}}]
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.environ.get('POSTGRES_DB'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB'),
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', '127.0.0.1'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'cyberguard-safe-cache',
+    }
 }
 
 SPECTACULAR_SETTINGS = {
@@ -57,6 +77,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # AbuseIPDB API (bepul ro'yxatdan o'tib oling: abuseipdb.com)
 ABUSEIPDB_API_KEY = os.environ.get('ABUSEIPDB_API_KEY', 'YOUR_API_KEY_HERE')
+CYBERGUARD_API_KEY = os.environ.get('CYBERGUARD_API_KEY', 'cyberguard-demo-key')
+SAFE_RATE_LIMIT_REQUESTS = int(os.environ.get('SAFE_RATE_LIMIT_REQUESTS', '60'))
+SAFE_RATE_LIMIT_WINDOW = int(os.environ.get('SAFE_RATE_LIMIT_WINDOW', '60'))
+SAFE_SCAN_CACHE_TTL = int(os.environ.get('SAFE_SCAN_CACHE_TTL', '120'))
+THREAT_INTEL_CACHE_TTL = int(os.environ.get('THREAT_INTEL_CACHE_TTL', '900'))
+WEBSOCKET_RECENT_EVENT_LIMIT = int(os.environ.get('WEBSOCKET_RECENT_EVENT_LIMIT', '25'))
 
 # Demo local IP lar — real tarmoqdagi qurilmalar
 LOCAL_DEMO_IPS = {

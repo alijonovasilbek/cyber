@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class ThreatLog(models.Model):
     SEVERITY_CHOICES = [
         ('critical', 'Kritik'),
@@ -66,6 +67,7 @@ class ConnectionProfile(models.Model):
         ('ssh', 'SSH'),
         ('telnet', 'Telnet'),
         ('snmp', 'SNMP'),
+        ('web', 'Web'),
     ]
     SNMP_VERSIONS = [
         ('2c', 'SNMP v2c'),
@@ -117,4 +119,61 @@ class ScanSession(models.Model):
 
     def __str__(self):
         return f"Scan #{self.pk} {self.profile.name} ({self.status})"
+
+
+class TrafficEventLog(models.Model):
+    TRAFFIC_TYPES = [
+        ('normal', 'Normal'),
+        ('ddos', 'DDoS Simulation'),
+        ('brute_force', 'Brute Force Simulation'),
+    ]
+
+    ip_address = models.GenericIPAddressField()
+    port = models.PositiveIntegerField()
+    traffic_type = models.CharField(max_length=20, choices=TRAFFIC_TYPES)
+    request_count = models.PositiveIntegerField(default=0)
+    failed_attempts = models.PositiveIntegerField(default=0)
+    packet_size_avg = models.FloatField(default=0.0)
+    connection_frequency = models.FloatField(default=0.0)
+    source = models.CharField(max_length=50, default='simulator')
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.ip_address}:{self.port} [{self.traffic_type}]"
+
+
+class IPAnalysisRecord(models.Model):
+    THREAT_LEVELS = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+    ]
+    ATTACK_TYPES = [
+        ('normal', 'Normal'),
+        ('ddos', 'DDoS'),
+        ('brute_force', 'Brute Force'),
+        ('anomaly', 'Anomaly'),
+    ]
+
+    ip_address = models.GenericIPAddressField()
+    requested_ports = models.JSONField(default=list, blank=True)
+    open_ports = models.JSONField(default=list, blank=True)
+    timeout_seconds = models.FloatField(default=0.35)
+    features = models.JSONField(default=dict, blank=True)
+    threat_level = models.CharField(max_length=10, choices=THREAT_LEVELS, default='low')
+    attack_type = models.CharField(max_length=20, choices=ATTACK_TYPES, default='normal')
+    confidence = models.FloatField(default=0.0)
+    intel = models.JSONField(default=dict, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.ip_address} -> {self.attack_type} ({self.threat_level})"
 

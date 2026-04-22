@@ -2,11 +2,13 @@
 import math
 import re
 import socket
+import ssl
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from random import Random
+from urllib.parse import urlparse
 
 import numpy as np
 import requests
@@ -435,6 +437,177 @@ def get_ip_reputation(ip: str) -> dict:
 def _local_risk_to_abuse(risk: str, open_ports: list) -> int:
     base = {'unknown': 12, 'low': 18, 'medium': 38, 'high': 67, 'critical': 88}.get(risk, 10)
     return min(100, base + len([port for port in open_ports if port in RISKY_PORTS]) * 4)
+
+
+def get_target_intel(target: str) -> dict:
+    host = _normalize_target(target)
+    if not host:
+        raise ValueError('Target majburiy.')
+
+    is_ip = _is_ip_value(host)
+    resolved_ips = [host] if is_ip else _resolve_host_ips(host)
+    primary_ip = resolved_ips[0] if resolved_ips else ''
+    ip_info = classify_ip(primary_ip) if primary_ip else None
+    open_ports = _limited_port_probe(host, [80, 443, 8080, 8443, 22, 23, 53])
+    web_checks = _collect_web_checks(host, open_ports)
+    tls_info = _fetch_tls_info(host) if any(item['port'] in (443, 8443) and item['open'] for item in open_ports) else {}
+
+    recommendations = []
+    if any(item['open'] and item['port'] in (22, 23) for item in open_ports):
+        recommendations.append('Remote admin portlari ochiq: access ACL va parollarni tekshiring.')
+    if any(item.get('auth_required') for item in web_checks):
+        recommendations.append("Web login mavjud: 2FA yoki IP cheklov qo'llash tavsiya etiladi.")
+    if not web_checks and any(item['open'] for item in open_ports):
+        recommendations.append('Servis portlari ochiq, lekin HTTP javob qaytmadi. Maxsus servis yoki firewall ehtimoli bor.')
+    if ip_info and ip_info.get('valid'):
+        recommendations.append(f"Tarmoq turi: {ip_info.get('network_type')}.")
+
+    return {
+        'target': target,
+        'normalized_target': host,
+        'target_type': 'ip' if is_ip else 'domain',
+        'resolved_ips': resolved_ips,
+        'primary_ip': primary_ip,
+        'ip_info': ip_info,
+        'service_ports': open_ports,
+        'web_checks': web_checks,
+        'tls_info': tls_info,
+        'safe_probe': {
+            'mode': 'limited-safe-diagnostics',
+            'request_count_per_endpoint': 3,
+            'note': "Bu yerda cheklangan diagnostik probe ishlatiladi, hujum yoki DDoS yuborilmaydi.",
+        },
+        'recommendations': recommendations[:5],
+    }
+
+
+def _normalize_target(target: str) -> str:
+    raw = (target or '').strip()
+    if not raw:
+        return ''
+    parsed = urlparse(raw if '://' in raw else f'//{raw}')
+    return (parsed.hostname or raw).strip().strip('/')
+
+
+def _is_ip_value(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _resolve_host_ips(host: str) -> list[str]:
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return []
+    ips = []
+    for info in infos:
+        candidate = info[4][0]
+        if candidate not in ips:
+            ips.append(candidate)
+    return ips[:8]
+
+
+def _limited_port_probe(host: str, ports: list[int]) -> list[dict]:
+    results = []
+    for port in ports:
+        started = time.perf_counter()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.45)
+        is_open = False
+        try:
+            is_open = sock.connect_ex((host, port)) == 0
+        except OSError:
+            is_open = False
+        finally:
+            sock.close()
+
+        results.append({
+            'port': port,
+            'open': is_open,
+            'latency_ms': round((time.perf_counter() - started) * 1000, 1),
+            'label': {
+                80: 'HTTP',
+                443: 'HTTPS',
+                8080: 'HTTP Alt',
+                8443: 'HTTPS Alt',
+                22: 'SSH',
+                23: 'Telnet',
+                53: 'DNS',
+            }.get(port, 'TCP'),
+        })
+    return results
+
+
+def _collect_web_checks(host: str, open_ports: list[dict]) -> list[dict]:
+    candidates = []
+    for item in open_ports:
+        if not item['open']:
+            continue
+        if item['port'] in (80, 8080):
+            candidates.append(('http', item['port']))
+        if item['port'] in (443, 8443):
+            candidates.append(('https', item['port']))
+
+    if not candidates:
+        candidates = [('https', 443), ('http', 80)]
+
+    checks = []
+    with requests.Session() as session:
+        session.headers.update({'User-Agent': 'CyberGuard-Intel/1.0'})
+        for scheme, port in candidates[:4]:
+            try:
+                checks.append(_probe_http_endpoint(session, host, scheme, port))
+            except Exception:
+                continue
+    return checks
+
+
+def _probe_http_endpoint(session, host: str, scheme: str, port: int) -> dict:
+    default_port = 443 if scheme == 'https' else 80
+    suffix = '' if port == default_port else f':{port}'
+    url = f'{scheme}://{host}{suffix}/'
+    latencies = []
+    response = None
+
+    for _ in range(3):
+        started = time.perf_counter()
+        current = session.get(url, timeout=4, allow_redirects=True, verify=False)
+        latencies.append(round((time.perf_counter() - started) * 1000, 1))
+        response = current
+
+    title_match = re.search(r'<title[^>]*>(.*?)</title>', response.text or '', re.IGNORECASE | re.DOTALL)
+    title = re.sub(r'\s+', ' ', title_match.group(1)).strip() if title_match else ''
+
+    return {
+        'scheme': scheme,
+        'port': port,
+        'url': response.url,
+        'status_code': response.status_code,
+        'title': title,
+        'server': response.headers.get('Server', ''),
+        'content_type': response.headers.get('Content-Type', ''),
+        'auth_required': response.status_code in (401, 403) or bool(response.headers.get('WWW-Authenticate')),
+        'latency_samples_ms': latencies,
+        'avg_latency_ms': round(sum(latencies) / len(latencies), 1) if latencies else 0,
+    }
+
+
+def _fetch_tls_info(host: str) -> dict:
+    try:
+        context = ssl.create_default_context()
+        with socket.create_connection((host, 443), timeout=3) as sock:
+            with context.wrap_socket(sock, server_hostname=host) as ssock:
+                cert = ssock.getpeercert()
+        return {
+            'subject': dict(item[0] for item in cert.get('subject', [])).get('commonName', ''),
+            'issuer': dict(item[0] for item in cert.get('issuer', [])).get('commonName', ''),
+            'expires_at': cert.get('notAfter', ''),
+        }
+    except Exception:
+        return {}
 
 
 def analyze_threat(ip: str, threat_type: str, algorithms: list, context: str = '') -> dict:

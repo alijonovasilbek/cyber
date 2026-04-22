@@ -1,5 +1,13 @@
 from rest_framework import serializers
-from .models import BlockedIP, ConnectionProfile, NetworkDevice, ScanSession, ThreatLog
+from .models import (
+    BlockedIP,
+    ConnectionProfile,
+    IPAnalysisRecord,
+    NetworkDevice,
+    ScanSession,
+    ThreatLog,
+    TrafficEventLog,
+)
 
 
 class ThreatLogSerializer(serializers.ModelSerializer):
@@ -14,6 +22,18 @@ class ThreatLogSerializer(serializers.ModelSerializer):
 class BlockedIPSerializer(serializers.ModelSerializer):
     class Meta:
         model  = BlockedIP
+        fields = '__all__'
+
+
+class TrafficEventLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrafficEventLog
+        fields = '__all__'
+
+
+class IPAnalysisRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IPAnalysisRecord
         fields = '__all__'
 
 
@@ -35,6 +55,10 @@ class AnalyzeRequestSerializer(serializers.Serializer):
         default=['Random Forest', 'XGBoost'],
     )
     context     = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class TargetIntelRequestSerializer(serializers.Serializer):
+    target = serializers.CharField()
 
 
 class IPInfoSerializer(serializers.Serializer):
@@ -125,6 +149,7 @@ class LiveLogEntrySerializer(serializers.Serializer):
 
 class LiveLogsResponseSerializer(serializers.Serializer):
     logs = LiveLogEntrySerializer(many=True)
+    events = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class NetworkInterfaceSerializer(serializers.Serializer):
@@ -222,10 +247,13 @@ class ConnectionProfileWriteSerializer(serializers.ModelSerializer):
                 attrs['port'] = 161
             if attrs.get('snmp_version', getattr(self.instance, 'snmp_version', '2c')) != '2c':
                 raise serializers.ValidationError({'snmp_version': "Hozircha faqat SNMP v2c qo'llab-quvvatlanadi."})
+        elif profile_type == 'web':
+            if port in (None, 0):
+                attrs['port'] = 80
         else:
-            raise serializers.ValidationError({'profile_type': "Qo'llab-quvvatlanadigan tur: ssh, telnet yoki snmp."})
+            raise serializers.ValidationError({'profile_type': "Qo'llab-quvvatlanadigan tur: ssh, telnet, snmp yoki web."})
 
-        if not self.instance and not secret:
+        if not self.instance and not secret and profile_type != 'web':
             raise serializers.ValidationError({'secret': 'Password/community majburiy.'})
         return attrs
 
@@ -247,4 +275,93 @@ class ScanSessionSerializer(serializers.ModelSerializer):
 class RunScanRequestSerializer(serializers.Serializer):
     interface_name = serializers.CharField(required=False, allow_blank=True, default='')
     network_name = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class SafeScanRequestSerializer(serializers.Serializer):
+    ip_address = serializers.IPAddressField()
+    ports = serializers.ListField(
+        child=serializers.IntegerField(min_value=1, max_value=65535),
+        required=False,
+        allow_empty=True,
+    )
+    timeout = serializers.FloatField(required=False, min_value=0.05, max_value=0.5, default=0.35)
+
+
+class PortCheckResultSerializer(serializers.Serializer):
+    port = serializers.IntegerField()
+    open = serializers.BooleanField()
+    latency_ms = serializers.FloatField()
+
+
+class SafeScanResponseSerializer(serializers.Serializer):
+    ip = serializers.IPAddressField()
+    requested_ports = serializers.ListField(child=serializers.IntegerField())
+    open_ports = serializers.ListField(child=serializers.IntegerField())
+    port_details = PortCheckResultSerializer(many=True)
+    timeout_seconds = serializers.FloatField()
+    scanned_at = serializers.DateTimeField()
+    cached = serializers.BooleanField()
+    analysis_id = serializers.IntegerField(required=False)
+
+
+class SimulateTrafficRequestSerializer(serializers.Serializer):
+    ip_address = serializers.IPAddressField()
+    simulation_type = serializers.ChoiceField(choices=['normal', 'ddos', 'brute_force'])
+    port = serializers.IntegerField(required=False, min_value=1, max_value=65535)
+    samples = serializers.IntegerField(required=False, min_value=4, max_value=24, default=12)
+    auto_response = serializers.BooleanField(required=False, default=True)
+
+
+class SimulatedTrafficLogSerializer(serializers.Serializer):
+    ip = serializers.IPAddressField()
+    port = serializers.IntegerField()
+    request_count = serializers.IntegerField()
+    failed_attempts = serializers.IntegerField()
+    packet_size_avg = serializers.FloatField()
+    connection_frequency = serializers.FloatField()
+    traffic_type = serializers.CharField()
+    timestamp = serializers.DateTimeField()
+    source = serializers.CharField()
+
+
+class TrafficAnalysisSerializer(serializers.Serializer):
+    threat_level = serializers.CharField()
+    attack_type = serializers.CharField()
+    confidence = serializers.FloatField()
+    features = serializers.DictField()
+    model_scores = serializers.DictField(child=serializers.FloatField())
+    signals = serializers.ListField(child=serializers.CharField())
+    log_id = serializers.IntegerField(required=False)
+    blocked = serializers.BooleanField(required=False)
+
+
+class SimulateTrafficResponseSerializer(serializers.Serializer):
+    logs = SimulatedTrafficLogSerializer(many=True)
+    analysis = TrafficAnalysisSerializer()
+    reputation = serializers.DictField()
+    blocked = serializers.BooleanField()
+
+
+class BehaviorAnalyzeRequestSerializer(serializers.Serializer):
+    ip_address = serializers.IPAddressField(required=False)
+    event_ids = serializers.ListField(child=serializers.IntegerField(), required=False, allow_empty=False)
+    auto_response = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        if not attrs.get('ip_address') and not attrs.get('event_ids'):
+            raise serializers.ValidationError("ip_address yoki event_ids berilishi kerak.")
+        return attrs
+
+
+class ThreatPredictionRequestSerializer(serializers.Serializer):
+    ip_address = serializers.IPAddressField(required=False)
+
+
+class ThreatPredictionResponseSerializer(serializers.Serializer):
+    scope = serializers.CharField()
+    predicted_threat_level = serializers.CharField()
+    predicted_attack_type = serializers.CharField()
+    confidence = serializers.FloatField()
+    next_window_minutes = serializers.IntegerField()
+    reasoning = serializers.ListField(child=serializers.CharField())
 

@@ -11,14 +11,14 @@ const THREATS_LIST = [
 const ALGOS_LIST = ['Random Forest','XGBoost','LSTM','SVM','Isolation Forest','Autoencoder'];
 
 const THREAT_LIBRARY = [
-  { key:'ddos',      sev:'critical', name:'DDoS hujumi',      desc:'Serverga katta hajmli so\'rovlar yuborib uni ishdan chiqaradi.', signs:'Trafik keskin oshishi, javob vaqti sekinlashishi, xizmat uzilishi.', algo:'Isolation Forest, K-Means, LSTM' },
-  { key:'sqli',      sev:'critical', name:'SQL Injection',     desc:'Ma\'lumotlar bazasiga zararli SQL so\'rovlar kiritish orqali ma\'lumot o\'g\'irlash.', signs:'G\'ayrioddiy DB so\'rovlari, xato xabarlari, katta chiqish hajmi.', algo:'Random Forest, Naive Bayes, SVM' },
-  { key:'ransomware',sev:'critical', name:'Ransomware',        desc:'Fayllarni shifrlaydi va qulfdan chiqarish uchun to\'lov talab qiladi.', signs:'Fayl kengaytmalarining ommaviy o\'zgarishi, CPU/disk faolligi oshishi.', algo:'Autoencoder, LSTM' },
-  { key:'zero_day',  sev:'critical', name:'Zero-Day',          desc:'Hali noma\'lum yoki yamoqlanmagan zaifliklarni ishlatish.', signs:'Noodatiy dastur xatti-harakati, noma\'lum jarayonlar.', algo:'Autoencoder, Isolation Forest' },
-  { key:'apt',       sev:'high',     name:'APT',               desc:'Davlat yoki katta guruhlar tomonidan olib boriladigan uzoq muddatli yashirin hujum.', signs:'Kichik noodatiy so\'rovlar, noma\'lum protokollar, uzoq sessiyalar.', algo:'Isolation Forest, Autoencoder, LSTM' },
-  { key:'brute',     sev:'high',     name:'Brute Force',       desc:'Parolni ketma-ket urinishlar bilan topishga harakat.', signs:'Ko\'p muvaffaqiyatsiz login, bir IP dan ketma-ket urinish.', algo:'Random Forest, XGBoost' },
-  { key:'phishing',  sev:'high',     name:'Phishing',          desc:'Soxta saytlar yoki emaillar orqali foydalanuvchi ma\'lumotlarini o\'g\'irlash.', signs:'Noma\'lum domenlar, o\'xshash URL\'lar, shubhali email manbalari.', algo:'Random Forest, XGBoost, Naive Bayes' },
-  { key:'mitm',      sev:'medium',   name:'Man-in-the-Middle', desc:'Ikki tomon o\'rtasidagi aloqani tutib olish va o\'zgartirish.', signs:'Sertifikat xatolari, noodatiy tarmoq yo\'nalishlari.', algo:'SVM, CNN' },
+  { key:'ddos', sev:'critical', name:'DDoS hujumi', desc:'Katta hajmdagi trafik yoki ko\'p concurrent request orqali xizmatni sekinlashtirish yoki to\'xtatish.', signs:'Trafik keskin oshishi, RTT ko\'tarilishi, 5xx xatolar, upstream saturation.', algo:'Isolation Forest, K-Means, LSTM', impact:'Public servislar ishlamay qoladi, mijozlar ulana olmaydi, bandwidth to\'ladi.', detect:['Traffic baseline buzilishi','Connection burst','Source entropy keskin oshishi'], stages:['Botnet tayyorlash','Traffic flood','Service degradation','Mitigation / scrubbing'], metrics:{ detect:94, contain:78, business:97 }, usecases:['Public API','Web portal','Game/backend ingress'] },
+  { key:'sqli', sev:'critical', name:'SQL Injection', desc:'Input parametrlari orqali backend query qatlamiga zararli SQL yuborib ma\'lumotlarni o\'qish yoki o\'zgartirish.', signs:'UNION/SELECT payloadlar, DB xatolari, auth bypass, jadval enumeratsiyasi.', algo:'Random Forest, Naive Bayes, SVM', impact:'Ma\'lumotlar sizishi, admin bypass, DB integritetiga zarar.', detect:['WAF signature','DB response anomaly','App log pattern'], stages:['Recon payload','Input exploit','Data extraction','Persistence / cleanup'], metrics:{ detect:91, contain:83, business:96 }, usecases:['Legacy admin panel','Search/filter endpoint','Login forms'] },
+  { key:'ransomware', sev:'critical', name:'Ransomware', desc:'Endpoint yoki serverga tushib fayllarni shifrlaydi va tiklash uchun to\'lov talab qiladi.', signs:'Mass file rename, shadow copy o\'chishi, CPU/disk spike, lateral movement.', algo:'Autoencoder, LSTM', impact:'Fayl serverlar, endpointlar va backup jarayoni falaj bo\'ladi.', detect:['File entropy spike','Suspicious process tree','SMB lateral move'], stages:['Initial access','Privilege escalation','Encryption wave','Ransom demand'], metrics:{ detect:88, contain:71, business:99 }, usecases:['File server','Endpoint fleet','Backup infra'] },
+  { key:'zero_day', sev:'critical', name:'Zero-Day', desc:'Hali imzosi yoki ommaviy patchi yo\'q zaifliklardan foydalanadigan hujum turi.', signs:'Noodatiy process/traffic pattern, no known signature, patch gap.', algo:'Autoencoder, Isolation Forest', impact:'Signature-based himoyani chetlab o\'tadi, tez privilege gain beradi.', detect:['Behavior anomaly','Memory artefact','Rare process chain'], stages:['Unknown exploit','Silent foothold','Stealth execution','Analyst validation'], metrics:{ detect:79, contain:58, business:95 }, usecases:['Fresh CVE window','Vendor appliance','Custom app stack'] },
+  { key:'apt', sev:'high', name:'APT', desc:'Uzoq muddatli, yashirin va ko\'p bosqichli maqsadli hujum kampaniyasi.', signs:'Beaconing, credential theft, lateral move, off-hours activity, covert exfil.', algo:'Isolation Forest, Autoencoder, LSTM', impact:'Ichki segmentlar komprometi, uzoq yashirin presence, data exfiltration.', detect:['Beacon interval','Rare admin path','Cross-host chain'], stages:['Initial foothold','Persistence','Lateral movement','Exfiltration'], metrics:{ detect:82, contain:67, business:93 }, usecases:['Enterprise AD','Hybrid cloud','Crown-jewel DB'] },
+  { key:'brute', sev:'high', name:'Brute Force', desc:'Ko\'p martalik login urinishlari bilan credentialni topishga harakat qiladigan hujum.', signs:'Bir IP dan ko\'p auth fail, account lock, password spray pattern.', algo:'Random Forest, XGBoost', impact:'VPN, SSH yoki admin account compromise xavfi yuqori.', detect:['Failed auth burst','Multi-user password spray','Geo anomaly'], stages:['Username gather','Password spray','Credential hit','Privilege use'], metrics:{ detect:96, contain:86, business:74 }, usecases:['VPN portal','SSH gateway','SSO login'] },
+  { key:'phishing', sev:'high', name:'Phishing', desc:'Soxta email, domen yoki login forma orqali foydalanuvchi credentialini olishga qaratilgan usul.', signs:'Lookalike domain, spoofed sender, urgent CTA, fake login form.', algo:'Random Forest, XGBoost, Naive Bayes', impact:'Credential theft, session hijack, malware delivery.', detect:['Domain similarity','Sender reputation','Landing page fingerprint'], stages:['Lure creation','Delivery','Credential capture','Reuse / pivot'], metrics:{ detect:89, contain:77, business:87 }, usecases:['Corporate email','Brand impersonation','Fake M365 login'] },
+  { key:'mitm', sev:'medium', name:'Man-in-the-Middle', desc:'Aloqa oralig\'ida turib trafikni kuzatish, o\'zgartirish yoki soxta sertifikat bilan tutib olish.', signs:'TLS warning, ARP spoof, cert mismatch, transparent proxy traces.', algo:'SVM, CNN', impact:'Session interception, token theft, trafik manipulyatsiyasi.', detect:['ARP inconsistency','Cert mismatch','Proxy chain anomaly'], stages:['Positioning','Traffic interception','Modification','Session theft'], metrics:{ detect:76, contain:72, business:68 }, usecases:['Open Wi-Fi','Flat LAN','Weak certificate pinning'] },
 ];
 
 const ALGO_LIBRARY = [
@@ -31,6 +31,17 @@ const ALGO_LIBRARY = [
   { key:'cnn', name:'CNN',              type:'Deep Learning', acc:93.1, sub:'Pattern',         desc:'Tarmoq paket ma\'lumotlarini "rasm" sifatida o\'qib, pattern tahlili qiladi. Malware klassifikatsiya uchun kuchli.' },
   { key:'nb',  name:'Naive Bayes',      type:'Supervised',    acc:82.1, sub:'Probabilistic',   desc:'Phishing email aniqlashda kuchli. Katta hajmli log tahlilida haqiqiy vaqt uchun tanlangan.' },
 ];
+
+const ALGO_VISUAL_METRICS = {
+  rf: { speed: 88, explain: 91, zeroDay: 64, stream: 78 },
+  xgb: { speed: 84, explain: 73, zeroDay: 69, stream: 81 },
+  svm: { speed: 70, explain: 62, zeroDay: 66, stream: 58 },
+  lstm: { speed: 61, explain: 38, zeroDay: 79, stream: 74 },
+  ae: { speed: 75, explain: 49, zeroDay: 94, stream: 71 },
+  iso: { speed: 93, explain: 68, zeroDay: 88, stream: 89 },
+  cnn: { speed: 64, explain: 35, zeroDay: 72, stream: 67 },
+  nb: { speed: 96, explain: 85, zeroDay: 42, stream: 92 },
+};
 
 const DATASETS = [
   { name:'NSL-KDD',    records:'125,973',   pct:10,  desc:'1999-KDD yaxshilangan versiyasi. 41 xususiyat, 4 hujum kategoriyasi: DoS, Probe, R2L, U2R.' },
@@ -53,6 +64,53 @@ const SIEM_CAPABILITY_ROWS = [
   { key:'ml', label:'ML/AI', color:'#b5cef0' },
   { key:'cost', label:'Narx samaradorligi', color:'#94b7de' },
 ];
+
+const THREAT_DETAIL_MAP = Object.fromEntries(THREAT_LIBRARY.map(item => [item.key, item]));
+
+const SIEM_DETAIL_MAP = {
+  splunk: {
+    sources:['Syslog','Windows Event','EDR','Cloud audit'],
+    pipeline:['Ingest','Normalize','Search','Alert','SOAR'],
+    strengths:['Kuchli qidiruv tili','Mature app ecosystem','Large-scale retention'],
+    fit:['Enterprise SOC','Regulated env','MSSP'],
+    ops:{ deploy:72, tuning:84, learning:79 },
+  },
+  qradar: {
+    sources:['NetFlow','Syslog','Vuln scanner','IAM'],
+    pipeline:['Collect','Correlate','Offense','Enrich','Respond'],
+    strengths:['Asset-aware correlation','Flow analytics','Offense model'],
+    fit:['Large enterprise','NOC+SOC','On-prem heavy'],
+    ops:{ deploy:67, tuning:76, learning:68 },
+  },
+  sentinel: {
+    sources:['Azure AD','M365','Defender','AWS/GCP'],
+    pipeline:['Connector','KQL','Analytics','Incident','Playbook'],
+    strengths:['Cloud-native scaling','Strong Microsoft integration','Fast onboarding'],
+    fit:['Azure infra','Modern SaaS','Lean SOC'],
+    ops:{ deploy:88, tuning:71, learning:74 },
+  },
+  elk: {
+    sources:['Beats','Syslog','APM','Custom app logs'],
+    pipeline:['Ship','Parse','Index','Visualize','Alert'],
+    strengths:['Flexible schema','Open ecosystem','Custom dashboards'],
+    fit:['Custom pipelines','DevSecOps','Observability-heavy'],
+    ops:{ deploy:74, tuning:63, learning:66 },
+  },
+  wazuh: {
+    sources:['Agents','Syscheck','Auditd','Vuln feed'],
+    pipeline:['Agent','Rule engine','Indexer','Dashboards','Response'],
+    strengths:['FIM','Compliance packs','Endpoint telemetry'],
+    fit:['SMB SOC','Endpoint-first','Compliance'],
+    ops:{ deploy:81, tuning:69, learning:77 },
+  },
+  graylog: {
+    sources:['Syslog','JSON app logs','Firewall','NGINX'],
+    pipeline:['Ingest','Extract','Stream','Alert','Case'],
+    strengths:['Simple streams','Fast deployment','Good operator UX'],
+    fit:['Mid-size SOC','IT ops + Sec','Budget aware'],
+    ops:{ deploy:86, tuning:73, learning:84 },
+  },
+};
 
 const TOPOLOGY_NODES = [
   { key:'attacker', label:'Attacker', x:12, y:42, tone:'hostile' },
@@ -93,6 +151,37 @@ const TOPOLOGY_SCENARIOS = {
   },
 };
 
+const NETWORK_TYPE_GUIDES = [
+  {
+    key: 'star',
+    name: 'Star Topology',
+    fit: 'Ofis LAN, switch-markazli tarmoq',
+    summary: 'Barcha endpointlar bitta markaziy switch yoki firewallga ulanadi. Monitoring va segmentlash oson.',
+    pros: ['Fault isolation oson', 'Yangi host qo‘shish qulay', 'Central ACL / IDS uchun yaxshi'],
+  },
+  {
+    key: 'mesh',
+    name: 'Mesh Topology',
+    fit: 'Data center, high-availability segment',
+    summary: 'Node-lar bir nechta yo‘l orqali bog‘langan bo‘ladi. Redundancy kuchli, lekin murakkab.',
+    pros: ['Single point of failure past', 'Qo‘shimcha redundant path', 'Traffic engineering kuchli'],
+  },
+  {
+    key: 'tree',
+    name: 'Tree / Hierarchical',
+    fit: 'Campus, enterprise branch arxitekturasi',
+    summary: 'Core, distribution va access qatlamlaridan tuzilgan ko‘p bosqichli model.',
+    pros: ['Katta tarmoqni boshqarish qulay', 'Policy qatlamlab beriladi', 'VLAN va zone segmentlash aniq'],
+  },
+  {
+    key: 'hybrid',
+    name: 'Hybrid / Zero Trust Overlay',
+    fit: 'Cloud + on-prem + remote users',
+    summary: 'LAN, VPN, cloud va SaaS resurslari birga ishlaydi. Identity va telemetry markaziy rol o‘ynaydi.',
+    pros: ['Cloud integratsiya oson', 'Remote access moslashuvchan', 'Telemetry-driven access control'],
+  },
+];
+
 const LIVE_TICKER_ITEMS = [
   'LOKAL TARMOQ SKANI FAQAT LIVE BACKEND NATIJALARINI KO\'RSATADI',
   'THREAT LOGLAR FAQAT SAQLANGAN ANALIZ VA BLOKLASH YOZUVLARIDAN OLINADI',
@@ -121,6 +210,90 @@ function useClock() {
   }, []);
   return time;
 }
+
+function useLiveFeed() {
+  const [logs, setLogs] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let socket;
+    let retryId;
+
+    const mergeEvent = event => {
+      setEvents(prev => [event, ...prev].slice(0, 40));
+      if (event?.kind === 'threat.detected') {
+        setLogs(prev => [{
+          id: `evt-${event.timestamp}`,
+          level: event.payload?.threat_level === 'HIGH' ? 'error' : event.payload?.threat_level === 'MEDIUM' ? 'warn' : 'info',
+          message: `${event.payload?.attack_type || 'Threat'} aniqlandi`,
+          timestamp: event.timestamp,
+          ip: event.payload?.ip || event.payload?.scope || '-',
+        }, ...prev].slice(0, 20));
+      }
+    };
+
+    const loadInitial = async () => {
+      try {
+        const response = await api.getLiveLogs();
+        if (!active) return;
+        setLogs(response.logs || []);
+        setEvents(response.events || []);
+      } catch {
+        if (!active) return;
+        setLogs([]);
+        setEvents([]);
+      }
+    };
+
+    const connect = () => {
+      try {
+        socket = api.openLiveSocket();
+      } catch {
+        return;
+      }
+
+      socket.onopen = () => {
+        if (!active) return;
+        setConnected(true);
+      };
+
+      socket.onmessage = event => {
+        if (!active) return;
+        try {
+          mergeEvent(JSON.parse(event.data));
+        } catch {
+          return;
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) return;
+        setConnected(false);
+        retryId = setTimeout(connect, 2500);
+      };
+
+      socket.onerror = () => {
+        if (!active) return;
+        setConnected(false);
+      };
+    };
+
+    loadInitial();
+    connect();
+
+    return () => {
+      active = false;
+      if (retryId) clearTimeout(retryId);
+      if (socket && socket.readyState < 2) socket.close();
+    };
+  }, []);
+
+  return { logs, events, connected };
+}
+
+const threatLevelColor = level => ({ HIGH: '#ff1744', MEDIUM: '#ffab00', LOW: '#39ff14' }[String(level || '').toUpperCase()] || '#00e5ff');
 
 // ── REUSABLE COMPONENTS ────────────────────────────────────────────────────
 function StatusDot({ color = '#39ff14', pulse = true, size = 6 }) {
@@ -312,27 +485,28 @@ function DashboardPage() {
   const lineChart  = useRef();
   const donutChart = useRef();
   const [stats, setStats]   = useState(null);
-  const [logs, setLogs]     = useState([]);
+  const { logs, events, connected } = useLiveFeed();
+  const [prediction, setPrediction] = useState(null);
   const [refreshAt, setRefreshAt] = useState(new Date());
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [dashboard, liveLogs] = await Promise.all([
+        const [dashboard, predictionData] = await Promise.all([
           api.getDashboard(),
-          api.getLiveLogs(),
+          api.predictThreat({}),
         ]);
         setStats(dashboard);
-        setLogs(liveLogs.logs || []);
+        setPrediction(predictionData);
         setRefreshAt(new Date());
       } catch {
         setStats(null);
-        setLogs([]);
+        setPrediction(null);
       }
     };
 
     loadData();
-    const id = setInterval(loadData, 8000);
+    const id = setInterval(loadData, 12000);
     return () => clearInterval(id);
   }, []);
 
@@ -411,7 +585,7 @@ function DashboardPage() {
     { name: 'Threat Logs',  val: `${s.total_threats} ta`, cls: s.total_threats ? 'ok' : 'warn' },
     { name: 'Block Rate',   val: `${s.block_rate || 0}%`, cls: (s.block_rate || 0) >= 40 ? 'ok' : 'warn' },
     { name: 'Critical',     val: `${s.critical} ta`, cls: s.critical > 0 ? 'crit' : 'ok' },
-    { name: 'Live Stream',  val: logs.length ? 'ACTIVE' : 'IDLE', cls: logs.length ? 'ok' : 'warn' },
+    { name: 'Live Stream',  val: connected ? 'STREAMING' : (logs.length ? 'BUFFERED' : 'IDLE'), cls: connected || logs.length ? 'ok' : 'warn' },
     { name: 'Last Refresh', val: fmtTime(refreshAt), cls: 'ok' },
   ];
   const lvlColor = lvl => ({ error: '#ff1744', warn: '#ffab00', info: '#39ff14' }[lvl] || '#00e5ff');
@@ -453,6 +627,50 @@ function DashboardPage() {
               <div className="gauge-level" style={{ color: gaugeColor }}>{gaugeLabel}</div>
               <div className="gauge-sub">TAHDID DARAJASI</div>
             </div>
+          </div>
+        </Panel>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1.15fr .85fr', gap:14, marginTop:14 }}>
+        <Panel title="NEXT 5 MIN THREAT PREDICTION" color={threatLevelColor(prediction?.predicted_threat_level)}>
+          <div className="panel-body">
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10, marginBottom:14 }}>
+              {[
+                ['Threat level', prediction?.predicted_threat_level || 'LOW', threatLevelColor(prediction?.predicted_threat_level)],
+                ['Attack type', prediction?.predicted_attack_type || 'Normal', '#00e5ff'],
+                ['Confidence', prediction ? `${prediction.confidence}%` : '0%', '#9fc2ea'],
+                ['Window', prediction ? `${prediction.next_window_minutes} min` : '-', '#39ff14'],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                  <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
+                  <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:16 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'grid', gap:8 }}>
+              {(prediction?.reasoning || ['Prediction engine ishlamoqda...']).map(item => (
+                <div key={item} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(0,229,255,.03)', color:'#94b4c8', fontSize:12 }}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="REAL-TIME EVENT BUS" color="#39ff14"
+          extra={<span style={{ marginLeft: 'auto', fontFamily: 'Share Tech Mono', fontSize: 10, color: connected ? '#39ff14' : '#ffab00' }}>{connected ? 'WS CONNECTED' : 'WS RETRYING'}</span>}>
+          <div className="panel-body" style={{ maxHeight: 240, overflowY: 'auto', display:'grid', gap:8 }}>
+            {(events.length ? events : [{ kind:'system', timestamp:new Date().toISOString(), payload:{ message:'Live eventlar kutilmoqda' } }]).slice(0, 8).map((event, index) => (
+              <div key={`${event.kind}-${event.timestamp}-${index}`} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:10, marginBottom:6 }}>
+                  <span style={{ color:'#00e5ff', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(event.kind || 'event').toUpperCase()}</span>
+                  <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(event.timestamp)}</span>
+                </div>
+                <div style={{ color:'#94b4c8', fontSize:12, lineHeight:1.6 }}>
+                  {event.payload?.attack_type || event.payload?.summary || event.payload?.message || event.payload?.ip || 'Realtime event'}
+                </div>
+              </div>
+            ))}
           </div>
         </Panel>
       </div>
@@ -602,7 +820,7 @@ function ThreatsPage() {
 
 // ── NETWORK PAGE ───────────────────────────────────────────────────────────
 function NetworkPage({ onAnalyze }) {
-  const getDefaultProfilePort = type => ({ ssh: 22, telnet: 23, snmp: 161 }[type] || 22);
+  const getDefaultProfilePort = type => ({ ssh: 22, telnet: 23, snmp: 161, web: 80 }[type] || 22);
   const [devices, setDevices] = useState([]);
   const [interfaces, setInterfaces] = useState([]);
   const [wifiStatus, setWifiStatus] = useState(null);
@@ -635,33 +853,46 @@ function NetworkPage({ onAnalyze }) {
     authentication: '',
     encryption: '',
   });
+  const [safeScanForm, setSafeScanForm] = useState({ ip: '', ports: '21,22,23,80,443', timeout: 0.35 });
+  const [safeScanBusy, setSafeScanBusy] = useState(false);
+  const [safeScanResult, setSafeScanResult] = useState(null);
+  const [simForm, setSimForm] = useState({ ip: '', simulation_type: 'normal', samples: 8, auto_response: true });
+  const [simBusy, setSimBusy] = useState(false);
+  const [simResult, setSimResult] = useState(null);
 
   const loadNetworkContext = useCallback(async () => {
     try {
-      const [scanData, interfaceData, wifiData, profileData, sessionData] = await Promise.all([
+      const [scanData, interfaceData, wifiData, profileData, sessionData] = await Promise.allSettled([
         api.scanNetwork(),
         api.getInterfaces(),
         api.getWifiStatus(),
         api.getProfiles(),
         api.getScanSessions(),
       ]);
-      setDevices(scanData.devices || []);
-      setInterfaces(interfaceData.interfaces || []);
-      setWifiStatus(wifiData);
-      setProfiles(profileData.results || profileData || []);
-      setSessions(sessionData.results || sessionData || []);
 
-      const nextInterface = wifiData?.connected_interface
+      const scanPayload = scanData.status === 'fulfilled' ? scanData.value : { devices: [] };
+      const interfacePayload = interfaceData.status === 'fulfilled' ? interfaceData.value : { interfaces: [] };
+      const wifiPayload = wifiData.status === 'fulfilled' ? wifiData.value : null;
+      const profilePayload = profileData.status === 'fulfilled' ? profileData.value : [];
+      const sessionPayload = sessionData.status === 'fulfilled' ? sessionData.value : [];
+
+      setDevices(scanPayload.devices || []);
+      setInterfaces(interfacePayload.interfaces || []);
+      setWifiStatus(wifiPayload);
+      setProfiles(profilePayload.results || profilePayload || []);
+      setSessions(sessionPayload.results || sessionPayload || []);
+
+      const nextInterface = wifiPayload?.connected_interface
         || selectedInterface
-        || (interfaceData.interfaces || [])[0]?.name
+        || (interfacePayload.interfaces || [])[0]?.name
         || '';
       if (nextInterface) {
         setSelectedInterface(nextInterface);
       }
 
-      if (wifiData?.connected_ssid) {
-        setSelectedWifi(wifiData.connected_ssid);
-        setWifiForm(form => ({ ...form, ssid: wifiData.connected_ssid }));
+      if (wifiPayload?.connected_ssid) {
+        setSelectedWifi(wifiPayload.connected_ssid);
+        setWifiForm(form => ({ ...form, ssid: wifiPayload.connected_ssid }));
       }
     } catch {
       setDevices([]);
@@ -683,6 +914,8 @@ function NetworkPage({ onAnalyze }) {
   const checkRep = async (ip) => {
     setSelected(ip);
     setRepInfo(null);
+    setSafeScanForm(form => ({ ...form, ip }));
+    setSimForm(form => ({ ...form, ip }));
     try {
       const d = await api.getReputation(ip);
       setRepInfo(d);
@@ -770,7 +1003,58 @@ function NetworkPage({ onAnalyze }) {
     onAnalyze(session.target_host, { context: buildSessionContext(session) });
   };
 
+  const runSafeScan = async () => {
+    if (!safeScanForm.ip) return;
+    setSafeScanBusy(true);
+    setProfileError('');
+    try {
+      const ports = safeScanForm.ports
+        .split(',')
+        .map(item => Number(item.trim()))
+        .filter(item => Number.isFinite(item));
+      const response = await api.safeScan({
+        ip_address: safeScanForm.ip,
+        ports,
+        timeout: Number(safeScanForm.timeout || 0.35),
+      });
+      setSafeScanResult(response);
+    } catch (err) {
+      setProfileError(err.message || 'Safe scan bajarilmadi');
+      setSafeScanResult(null);
+    } finally {
+      setSafeScanBusy(false);
+    }
+  };
+
+  const runSimulation = async () => {
+    if (!simForm.ip) return;
+    setSimBusy(true);
+    setProfileError('');
+    try {
+      const response = await api.simulateTraffic({
+        ip_address: simForm.ip,
+        simulation_type: simForm.simulation_type,
+        samples: Number(simForm.samples || 8),
+        auto_response: simForm.auto_response,
+      });
+      setSimResult(response);
+    } catch (err) {
+      setProfileError(err.message || 'Traffic simulation bajarilmadi');
+      setSimResult(null);
+    } finally {
+      setSimBusy(false);
+    }
+  };
+
   useEffect(() => { loadNetworkContext(); }, [loadNetworkContext]);
+  useEffect(() => {
+    if (!devices.length) return;
+    const firstIp = selected || devices[0]?.ip || '';
+    if (firstIp) {
+      setSafeScanForm(form => form.ip ? form : { ...form, ip: firstIp });
+      setSimForm(form => form.ip ? form : { ...form, ip: firstIp });
+    }
+  }, [devices, selected]);
 
   const riskColor = risk => ({ low: '#39ff14', medium: '#ffab00', high: '#fb923c', critical: '#ff1744' }[risk] || '#39ff14');
   const deviceStats = {
@@ -891,6 +1175,103 @@ function NetworkPage({ onAnalyze }) {
           </div>
         </Panel>
       )}
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
+        <Panel title="SAFE IP COLLECTOR" color="#00e5ff">
+          <div className="panel-body">
+            <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr .6fr auto', gap:10, alignItems:'center' }}>
+              <input value={safeScanForm.ip} onChange={e => setSafeScanForm(form => ({ ...form, ip: e.target.value }))} placeholder="IP address" style={inputStyle}/>
+              <input value={safeScanForm.ports} onChange={e => setSafeScanForm(form => ({ ...form, ports: e.target.value }))} placeholder="21,22,80,443" style={inputStyle}/>
+              <input value={safeScanForm.timeout} onChange={e => setSafeScanForm(form => ({ ...form, timeout: e.target.value }))} type="number" step="0.05" min="0.05" max="0.5" style={inputStyle}/>
+              <button className="action-btn" onClick={runSafeScan} disabled={safeScanBusy || !safeScanForm.ip}>
+                {safeScanBusy ? 'SCANNING...' : 'SCAN-IP'}
+              </button>
+            </div>
+            <div style={{ marginTop:8, color:'#4a6a84', fontSize:11, lineHeight:1.7 }}>
+              Safe mode: maksimal 10 port, timeout 0.5s dan oshmaydi. Aggressive probing qilinmaydi.
+            </div>
+            {safeScanResult && (
+              <div style={{ marginTop:12, display:'grid', gap:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10 }}>
+                  {[
+                    ['Target', safeScanResult.ip, '#00e5ff'],
+                    ['Open ports', `${safeScanResult.open_ports?.length || 0} ta`, '#39ff14'],
+                    ['Timeout', `${safeScanResult.timeout_seconds}s`, '#9fc2ea'],
+                    ['Cache', safeScanResult.cached ? 'HIT' : 'MISS', safeScanResult.cached ? '#ffab00' : '#4ade80'],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                      <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
+                      <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:15 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:8 }}>
+                  {(safeScanResult.port_details || []).map(item => (
+                    <div key={item.port} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:item.open ? 'rgba(57,255,20,.05)' : 'rgba(255,255,255,.02)' }}>
+                      <div style={{ color:'#7ab8d4', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>PORT {item.port}</div>
+                      <div style={{ color:item.open ? '#39ff14' : '#4a6a84', fontFamily:'Share Tech Mono', fontSize:12 }}>{item.open ? 'OPEN' : 'CLOSED'}</div>
+                      <div style={{ color:'#94b4c8', fontSize:11, marginTop:4 }}>{item.latency_ms} ms</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className="action-btn" onClick={() => onAnalyze(safeScanResult.ip, { threat: 'port_scan', context: `Safe scan open ports: ${(safeScanResult.open_ports || []).join(', ') || 'none'}` })}>
+                    ANALYZE SAFE SCAN
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Panel>
+
+        <Panel title="SIMULATED TRAFFIC LAB" color="#ff1744">
+          <div className="panel-body">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr .7fr auto', gap:10, alignItems:'center' }}>
+              <input value={simForm.ip} onChange={e => setSimForm(form => ({ ...form, ip: e.target.value }))} placeholder="Target IP" style={inputStyle}/>
+              <select value={simForm.simulation_type} onChange={e => setSimForm(form => ({ ...form, simulation_type: e.target.value }))} style={inputStyle}>
+                <option value="normal">Normal</option>
+                <option value="ddos">DDoS</option>
+                <option value="brute_force">Brute Force</option>
+              </select>
+              <input value={simForm.samples} onChange={e => setSimForm(form => ({ ...form, samples: e.target.value }))} type="number" min="4" max="24" style={inputStyle}/>
+              <button className="action-btn" onClick={runSimulation} disabled={simBusy || !simForm.ip}>
+                {simBusy ? 'SIM...' : 'SIMULATE'}
+              </button>
+            </div>
+            <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, color:'#94b4c8', fontSize:12 }}>
+              <input type="checkbox" checked={simForm.auto_response} onChange={e => setSimForm(form => ({ ...form, auto_response: e.target.checked }))}/>
+              Safe auto-response ni simulyatsiya qilish
+            </label>
+            {simResult && (
+              <div style={{ marginTop:12, display:'grid', gap:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10 }}>
+                  {[
+                    ['Threat', simResult.analysis?.threat_level || '-', threatLevelColor(simResult.analysis?.threat_level)],
+                    ['Attack', simResult.analysis?.attack_type || '-', '#00e5ff'],
+                    ['Confidence', `${simResult.analysis?.confidence || 0}%`, '#9fc2ea'],
+                    ['Blocked', simResult.blocked ? 'YES' : 'NO', simResult.blocked ? '#39ff14' : '#ffab00'],
+                  ].map(([label, value, color]) => (
+                    <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                      <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
+                      <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:15 }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(255,23,68,.04)' }}>
+                  {(simResult.analysis?.signals || []).map(item => (
+                    <div key={item} style={{ color:'#94b4c8', fontSize:12, marginBottom:6 }}>{item}</div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button className="action-btn" onClick={() => onAnalyze(simForm.ip, { context: (simResult.analysis?.signals || []).join('\n'), threat: simForm.simulation_type === 'brute_force' ? 'brute_force' : simForm.simulation_type === 'ddos' ? 'ddos' : '' })}>
+                    OPEN IN ANALYZE
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
         <Panel title="WIFI HOLATI" color="#00e5ff">
@@ -1044,11 +1425,12 @@ function NetworkPage({ onAnalyze }) {
                 <option value="ssh">SSH</option>
                 <option value="telnet">Telnet</option>
                 <option value="snmp">SNMP</option>
+                <option value="web">WEB/HTTP</option>
               </select>
               <input value={profileForm.target_host} onChange={e => setProfileForm(p => ({ ...p, target_host: e.target.value }))} placeholder="Target host/IP" style={inputStyle}/>
               <input value={profileForm.port} onChange={e => setProfileForm(p => ({ ...p, port: Number(e.target.value || 0) }))} placeholder="Port" type="number" style={inputStyle}/>
-              <input value={profileForm.username} onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Username (ixtiyoriy)' : 'Username (SSH/Telnet)'} style={inputStyle}/>
-              <input value={profileForm.secret} onChange={e => setProfileForm(p => ({ ...p, secret: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Community' : 'Password'} type="password" style={inputStyle}/>
+              <input value={profileForm.username} onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Username (ixtiyoriy)' : profileForm.profile_type === 'web' ? 'Username (Basic Auth ixtiyoriy)' : 'Username (SSH/Telnet)'} style={inputStyle}/>
+              <input value={profileForm.secret} onChange={e => setProfileForm(p => ({ ...p, secret: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Community' : profileForm.profile_type === 'web' ? 'Password (Basic Auth ixtiyoriy)' : 'Password'} type="password" style={inputStyle}/>
               <input value={profileForm.network_label} onChange={e => setProfileForm(p => ({ ...p, network_label: e.target.value }))} placeholder="Tarmoq label/SSID" style={inputStyle}/>
               <select value={profileForm.snmp_version} onChange={e => setProfileForm(p => ({ ...p, snmp_version: e.target.value }))} style={inputStyle} disabled={profileForm.profile_type !== 'snmp'}>
                 <option value="2c">SNMP v2c</option>
@@ -1061,6 +1443,11 @@ function NetworkPage({ onAnalyze }) {
                 Credential tanlangan interface bilan ishlatiladi: {selectedInterface || '-'}
               </span>
             </div>
+            {profileForm.profile_type === 'web' && (
+              <div style={{ color: '#7ab8d4', fontSize: 12, marginTop: 10 }}>
+                `WEB/HTTP` router va admin panel uchun xavfsiz probe qiladi: sarlavha, title, status, auth va latency ko&apos;rsatiladi.
+              </div>
+            )}
             {profileError && <div style={{ color: '#ff8fa0', fontSize: 12, marginTop: 10 }}>{profileError}</div>}
           </div>
         </Panel>
@@ -1161,15 +1548,197 @@ function NetworkPage({ onAnalyze }) {
   );
 }
 
+function GlobalThreatMapPanel({ compact = false }) {
+  const origins = [
+    { x: 12, y: 20 }, { x: 18, y: 58 }, { x: 31, y: 64 }, { x: 49, y: 30 },
+    { x: 54, y: 24 }, { x: 60, y: 35 }, { x: 69, y: 29 }, { x: 74, y: 23 },
+  ];
+  const protectedNode = { x: 46, y: 46 };
+  const width = compact ? 520 : 680;
+  const height = compact ? 240 : 320;
+
+  return (
+    <div style={{ border: '1px solid var(--border2)', background: 'linear-gradient(180deg, rgba(7,18,35,.96), rgba(4,11,24,.98))' }}>
+      <svg viewBox="0 0 100 60" style={{ display: 'block', width: '100%', height }}>
+        {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(x => <line key={`vx-${x}`} x1={x} y1="0" x2={x} y2="60" stroke="rgba(43,77,118,.22)" strokeWidth="0.25"/>)}
+        {[10, 20, 30, 40, 50].map(y => <line key={`hy-${y}`} x1="0" y1={y} x2="100" y2={y} stroke="rgba(43,77,118,.22)" strokeWidth="0.25"/>)}
+        <path d="M6 9 L18 6 L21 12 L18 22 L12 27 L7 21 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        <path d="M15 27 L26 25 L30 30 L28 44 L18 47 L12 40 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        <path d="M38 6 L49 5 L49 14 L37 15 L35 10 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        <path d="M36 16 L50 15 L52 20 L49 38 L42 41 L36 34 L34 22 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        <path d="M49 5 L81 5 L83 12 L76 22 L64 26 L50 20 L49 14 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        <path d="M64 29 L81 28 L83 40 L74 44 L64 41 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        {origins.map((origin, index) => (
+          <g key={index}>
+            <line x1={origin.x} y1={origin.y} x2={protectedNode.x} y2={protectedNode.y} stroke={index % 2 ? 'rgba(255,59,92,.7)' : 'rgba(255,88,122,.55)'} strokeWidth="0.35"/>
+            <circle cx={origin.x} cy={origin.y} r="0.65" fill="#ff335c"/>
+            <circle cx={origin.x} cy={origin.y} r="1.35" fill="rgba(255,51,92,.18)"/>
+          </g>
+        ))}
+        <circle cx={protectedNode.x} cy={protectedNode.y} r="1.25" fill="#39ff14"/>
+        <circle cx={protectedNode.x} cy={protectedNode.y} r="3" fill="rgba(57,255,20,.12)"/>
+        <circle cx={protectedNode.x + 1.4} cy={protectedNode.y - 1.6} r="0.9" fill="#74ff5c"/>
+      </svg>
+      <div style={{ display: 'flex', gap: 16, padding: '0 12px 12px', fontSize: 10, color: '#7ea8ca', fontFamily: 'Share Tech Mono', flexWrap: 'wrap' }}>
+        <span style={{ color: '#ff4668' }}>● ATTACK ORIGIN</span>
+        <span style={{ color: '#39ff14' }}>● PROTECTED NODE</span>
+        <span style={{ color: '#6ea8ff' }}>— THREAT VECTOR</span>
+      </div>
+    </div>
+  );
+}
+
+function ThreatFlowPanel({ threat, color }) {
+  const item = threat || {};
+  const stages = item.stages || [];
+  const detect = item.detect || [];
+  const usecases = item.usecases || [];
+  const metrics = item.metrics || {};
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 12 }}>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>ATTACK FLOW</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(0, 1fr))`, gap: 8 }}>
+            {stages.map((stage, index) => (
+              <div key={stage} style={{ padding: 10, border: `1px solid ${color}33`, background: `${color}10`, minHeight: 74 }}>
+                <div style={{ color, fontFamily: 'Share Tech Mono', fontSize: 10, marginBottom: 6 }}>{String(index + 1).padStart(2, '0')}</div>
+                <div style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.5 }}>{stage}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>IMPACT SCORE</div>
+          {[
+            ['Aniqlash', metrics.detect || 0, '#00e5ff'],
+            ['Containment', metrics.contain || 0, '#ffab00'],
+            ['Biznes zarar', metrics.business || 0, color],
+          ].map(([label, value, tone]) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                <span style={{ color: '#94b4c8' }}>{label}</span>
+                <span style={{ color: tone, fontFamily: 'Share Tech Mono' }}>{value}%</span>
+              </div>
+              <div style={{ height: 5, background: 'var(--border2)' }}>
+                <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${tone}, rgba(255,255,255,.85))` }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>DETECTION CUES</div>
+          {detect.map(point => (
+            <div key={point} style={{ color: '#9fc2ea', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
+          ))}
+        </div>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>BUSINESS IMPACT</div>
+          <div style={{ color: '#dce8f5', fontSize: 13, lineHeight: 1.7 }}>{item.impact}</div>
+        </div>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>TYPICAL TARGETS</div>
+          {usecases.map(point => (
+            <div key={point} style={{ color: '#94b4c8', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SIEMArchitecturePanel({ tool }) {
+  const detail = SIEM_DETAIL_MAP[tool?.key] || { sources: [], pipeline: [], strengths: [], fit: [], ops: {} };
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr .85fr', gap: 12 }}>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>DATA FLOW</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+            {detail.pipeline.map((step, index) => (
+              <div key={step} style={{ padding: 10, border: '1px solid rgba(0,229,255,.18)', background: 'rgba(0,229,255,.06)', minHeight: 72 }}>
+                <div style={{ color: '#00e5ff', fontFamily: 'Share Tech Mono', fontSize: 10, marginBottom: 6 }}>{String(index + 1).padStart(2, '0')}</div>
+                <div style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.4 }}>{step}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
+            {detail.sources.map(source => (
+              <div key={source} style={{ padding: '8px 10px', border: '1px solid var(--border2)', background: 'rgba(159,194,234,.08)', color: '#cfe0f5', fontSize: 12 }}>
+                {source}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>OPERATIONS</div>
+          {[
+            ['Deploy', detail.ops.deploy || 0, '#39ff14'],
+            ['Tuning', detail.ops.tuning || 0, '#ffab00'],
+            ['Learning', detail.ops.learning || 0, '#9fc2ea'],
+          ].map(([label, value, tone]) => (
+            <div key={label} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                <span style={{ color: '#94b4c8' }}>{label}</span>
+                <span style={{ color: tone, fontFamily: 'Share Tech Mono' }}>{value}%</span>
+              </div>
+              <div style={{ height: 5, background: 'var(--border2)' }}>
+                <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${tone}, rgba(255,255,255,.82))` }}/>
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 8 }}>BEST FIT</div>
+            {detail.fit.map(item => (
+              <div key={item} style={{ color: '#dce8f5', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{item}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>STRONG SIDES</div>
+          {detail.strengths.map(item => (
+            <div key={item} style={{ color: '#94b4c8', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{item}</div>
+          ))}
+        </div>
+        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>VISUAL SNAPSHOT</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, alignItems: 'stretch' }}>
+            <div style={{ border: '1px solid rgba(0,229,255,.18)', background: 'linear-gradient(180deg, rgba(0,229,255,.14), rgba(159,194,234,.06))' }}/>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(159,194,234,.12)' }}/>
+              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(57,255,20,.1)' }}/>
+              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(255,171,0,.1)' }}/>
+              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(255,23,68,.08)' }}/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ANALYZE PAGE ───────────────────────────────────────────────────────────
 function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
-  const [form, setForm]     = useState({ ip: initialIP || '', threat: initialThreat || '', algos: ['Random Forest', 'XGBoost'], ctx: initialContext || '' });
+  const [form, setForm] = useState({ ip: initialIP || '', threat: initialThreat || '', algos: ['Random Forest', 'XGBoost'], ctx: initialContext || '', target: initialIP || '' });
   const [result, setResult] = useState(null);
+  const [intel, setIntel] = useState(null);
+  const [behavior, setBehavior] = useState(null);
+  const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [intelLoading, setIntelLoading] = useState(false);
+  const [behaviorLoading, setBehaviorLoading] = useState(false);
+  const [predictionLoading, setPredictionLoading] = useState(false);
   const [error, setError] = useState('');
   const [quickIps, setQuickIps] = useState([]);
 
-  useEffect(() => { if (initialIP) setForm(f => ({ ...f, ip: initialIP })); }, [initialIP]);
+  useEffect(() => { if (initialIP) setForm(f => ({ ...f, ip: initialIP, target: initialIP })); }, [initialIP]);
   useEffect(() => { if (initialContext) setForm(f => ({ ...f, ctx: initialContext })); }, [initialContext]);
   useEffect(() => { if (initialThreat) setForm(f => ({ ...f, threat: initialThreat })); }, [initialThreat]);
 
@@ -1189,7 +1758,9 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
 
   const analyze = async () => {
     if (!form.ip || !form.threat) return;
-    setLoading(true); setResult(null); setError('');
+    setLoading(true);
+    setResult(null);
+    setError('');
     try {
       const res = await api.analyzeThreat({ ip_address: form.ip, threat_type: form.threat, algorithms: form.algos, context: form.ctx });
       setResult(res);
@@ -1197,6 +1768,51 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
       setError(err?.message || 'Tahlilni bajarib bo\'lmadi');
     }
     setLoading(false);
+  };
+
+  const probeTarget = async () => {
+    if (!form.target) return;
+    setIntelLoading(true);
+    setError('');
+    try {
+      const response = await api.getTargetIntel({ target: form.target });
+      setIntel(response);
+      if (!form.ip && response.primary_ip) {
+        setForm(f => ({ ...f, ip: response.primary_ip }));
+      }
+    } catch (err) {
+      setError(err?.message || 'Target probe bajarilmadi');
+      setIntel(null);
+    }
+    setIntelLoading(false);
+  };
+
+  const analyzeBehavior = async () => {
+    if (!form.ip) return;
+    setBehaviorLoading(true);
+    setError('');
+    try {
+      const response = await api.analyzeBehavior({ ip_address: form.ip, auto_response: true });
+      setBehavior(response);
+    } catch (err) {
+      setError(err?.message || 'Behavior analysis bajarilmadi');
+      setBehavior(null);
+    }
+    setBehaviorLoading(false);
+  };
+
+  const predictWindow = async () => {
+    if (!form.ip) return;
+    setPredictionLoading(true);
+    setError('');
+    try {
+      const response = await api.predictThreat({ ip_address: form.ip });
+      setPrediction(response);
+    } catch (err) {
+      setError(err?.message || 'Prediction bajarilmadi');
+      setPrediction(null);
+    }
+    setPredictionLoading(false);
   };
 
   const sevColor = sev => ({ critical: '#ff1744', high: '#fb923c', medium: '#ffab00', low: '#39ff14' }[sev] || '#00e5ff');
@@ -1208,7 +1824,7 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 8, fontWeight: 700 }}>TEZKOR TANLASH:</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
             {quickIps.map(ip => (
-              <span key={ip} onClick={() => setForm(f => ({ ...f, ip }))} style={{
+              <span key={ip} onClick={() => setForm(f => ({ ...f, ip, target: ip }))} style={{
                 fontSize: 10, padding: '3px 8px', cursor: 'pointer', fontFamily: 'Share Tech Mono',
                 border: `1px solid ${form.ip === ip ? 'var(--cyan)' : 'var(--border)'}`,
                 color: form.ip === ip ? 'var(--cyan)' : 'var(--text-dim)',
@@ -1216,25 +1832,32 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
                 transition: 'all .15s',
               }}>{ip}</span>
             ))}
-            {quickIps.length === 0 && (
-              <span style={{ fontSize: 10, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>
-                Tarmoq scan natijalari hali mavjud emas
-              </span>
-            )}
+            {quickIps.length === 0 && <span style={{ fontSize: 10, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>Tarmoq scan natijalari hali mavjud emas</span>}
           </div>
 
-          {[
-            { label: 'IP MANZIL', key: 'ip', type: 'text', placeholder: '192.168.1.1' },
-          ].map(f => (
-            <div key={f.key} style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', display: 'block', marginBottom: 6, fontWeight: 700 }}>{f.label}</label>
-              <input value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                placeholder={f.placeholder} style={{
-                  width: '100%', background: 'rgba(0,229,255,.04)', border: '1px solid var(--border)',
-                  color: 'var(--text)', padding: '9px 12px', fontFamily: 'Share Tech Mono', fontSize: 13, outline: 'none',
-                }}/>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', display: 'block', marginBottom: 6, fontWeight: 700 }}>TARGET / DOMEN</label>
+            <input value={form.target} onChange={e => setForm(p => ({ ...p, target: e.target.value }))}
+              placeholder="192.168.1.1 yoki example.com" style={{
+                width: '100%', background: 'rgba(0,229,255,.04)', border: '1px solid var(--border)',
+                color: 'var(--text)', padding: '9px 12px', fontFamily: 'Share Tech Mono', fontSize: 13, outline: 'none',
+              }}/>
+            <button className="action-btn" onClick={probeTarget} disabled={intelLoading || !form.target} style={{ width: '100%', marginTop: 10 }}>
+              {intelLoading ? 'PROBE...' : 'SAFE PROBE / DOMAIN INFO'}
+            </button>
+            <div style={{ marginTop: 8, fontSize: 11, color: '#4a6a84', lineHeight: 1.6 }}>
+              Bu yerda faqat cheklangan diagnostik probe ishlatiladi. Hujum yoki DDoS yuborilmaydi.
             </div>
-          ))}
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', display: 'block', marginBottom: 6, fontWeight: 700 }}>IP MANZIL</label>
+            <input value={form.ip} onChange={e => setForm(p => ({ ...p, ip: e.target.value }))}
+              placeholder="192.168.1.1" style={{
+                width: '100%', background: 'rgba(0,229,255,.04)', border: '1px solid var(--border)',
+                color: 'var(--text)', padding: '9px 12px', fontFamily: 'Share Tech Mono', fontSize: 13, outline: 'none',
+              }}/>
+          </div>
 
           <div style={{ marginBottom: 12 }}>
             <label style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', display: 'block', marginBottom: 6, fontWeight: 700 }}>TAHDID TURI</label>
@@ -1267,15 +1890,10 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
             <label style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', display: 'block', marginBottom: 6, fontWeight: 700 }}>KONTEKST</label>
             <textarea value={form.ctx} onChange={e => setForm(f => ({ ...f, ctx: e.target.value }))}
               placeholder="Qo'shimcha ma'lumot (ixtiyoriy)..." style={{
-                width: '100%', height: 60, background: 'rgba(0,229,255,.04)', border: '1px solid var(--border)',
+                width: '100%', height: 80, background: 'rgba(0,229,255,.04)', border: '1px solid var(--border)',
                 color: 'var(--text)', padding: '9px 12px', fontFamily: 'Share Tech Mono', fontSize: 11,
                 outline: 'none', resize: 'vertical',
               }}/>
-            {form.ctx && (
-              <div style={{ marginTop: 8, fontSize: 11, color: '#4a6a84' }}>
-                Scan sessiyadan yoki qo&apos;lda yig&apos;ilgan ma&apos;lumot shu yerga tushadi va algoritmlar aynan shu kontekst bilan hisoblaydi.
-              </div>
-            )}
           </div>
 
           <button onClick={analyze} disabled={loading || !form.ip || !form.threat} style={{
@@ -1287,15 +1905,165 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
           }}>
             {loading ? 'TAHLIL QILINMOQDA...' : 'TAHLILNI BOSHLASH'}
           </button>
-          {error && (
-            <div style={{ marginTop: 12, color: '#ff8fa0', fontSize: 12 }}>
-              {error}
-            </div>
-          )}
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:10 }}>
+            <button className="action-btn" onClick={analyzeBehavior} disabled={behaviorLoading || !form.ip}>
+              {behaviorLoading ? 'BEHAVIOR...' : 'SAFE BEHAVIOR'}
+            </button>
+            <button className="action-btn" onClick={predictWindow} disabled={predictionLoading || !form.ip}>
+              {predictionLoading ? 'PREDICT...' : 'NEXT 5 MIN'}
+            </button>
+          </div>
+
+          {error && <div style={{ marginTop: 12, color: '#ff8fa0', fontSize: 12 }}>{error}</div>}
         </div>
       </Panel>
 
-      <div>
+      <div style={{ display: 'grid', gap: 14 }}>
+        {intel && (
+          <Panel title={`TARGET INTEL | ${intel.normalized_target}`} color="#39ff14">
+            <div className="panel-body">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 14 }}>
+                {[
+                  ['Turi', (intel.target_type || '-').toUpperCase(), '#00e5ff'],
+                  ['Resolved IP', intel.primary_ip || '-', '#9fc2ea'],
+                  ['Open service', `${(intel.service_ports || []).filter(item => item.open).length} ta`, '#39ff14'],
+                  ['Web endpoint', `${(intel.web_checks || []).length} ta`, '#ffab00'],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.45)' }}>
+                    <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 2, marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontFamily: 'Orbitron,monospace', fontSize: 18, color }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {intel.resolved_ips?.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div className="panel-title" style={{ marginBottom: 8 }}>RESOLVED IP LAR</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {intel.resolved_ips.map(ip => (
+                      <span key={ip} onClick={() => setForm(f => ({ ...f, ip }))}
+                        style={{ padding: '4px 10px', border: `1px solid ${form.ip === ip ? 'var(--cyan)' : 'var(--border2)'}`, cursor: 'pointer', fontFamily: 'Share Tech Mono', fontSize: 11, color: form.ip === ip ? 'var(--cyan)' : '#94b4c8' }}>
+                        {ip}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <div className="panel-title" style={{ marginBottom: 8 }}>SERVICE PORTLAR</div>
+                  {(intel.service_ports || []).map(item => (
+                    <div key={item.port} style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 10, marginBottom: 8, fontSize: 12 }}>
+                      <span style={{ color: '#7ab8d4', fontFamily: 'Share Tech Mono' }}>{item.port}</span>
+                      <span style={{ color: '#94b4c8' }}>{item.label}</span>
+                      <span style={{ color: item.open ? '#39ff14' : '#4a6a84', fontFamily: 'Share Tech Mono' }}>{item.open ? `OPEN ${item.latency_ms}ms` : 'CLOSED'}</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div className="panel-title" style={{ marginBottom: 8 }}>WEB / DOMAIN INFO</div>
+                  {(intel.web_checks || []).map(item => (
+                    <div key={`${item.scheme}-${item.port}`} style={{ marginBottom: 10, padding: 10, border: '1px solid var(--border2)', background: 'rgba(0,229,255,.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                        <span style={{ color: '#00e5ff', fontFamily: 'Share Tech Mono' }}>{item.scheme.toUpperCase()}:{item.port}</span>
+                        <span style={{ color: '#39ff14', fontFamily: 'Share Tech Mono' }}>{item.status_code}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#94b4c8', lineHeight: 1.6 }}>{item.title || item.url}</div>
+                      <div style={{ fontSize: 11, color: '#4a6a84', marginTop: 6 }}>Server: {item.server || '-'} | Avg latency: {item.avg_latency_ms} ms</div>
+                    </div>
+                  ))}
+                  {intel.tls_info?.subject && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: '#94b4c8', lineHeight: 1.7 }}>
+                      <div><span style={{ color: '#4a6a84' }}>TLS Subject: </span>{intel.tls_info.subject}</div>
+                      <div><span style={{ color: '#4a6a84' }}>Issuer: </span>{intel.tls_info.issuer || '-'}</div>
+                      <div><span style={{ color: '#4a6a84' }}>Expires: </span>{intel.tls_info.expires_at || '-'}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {intel.recommendations?.length > 0 && (
+                <div style={{ marginTop: 14, padding: 12, border: '1px solid rgba(57,255,20,.18)', background: 'rgba(57,255,20,.05)' }}>
+                  <div style={{ fontSize: 10, letterSpacing: 2, color: '#39ff14', fontWeight: 700, marginBottom: 8 }}>SAFE PROBE TAVSIYALARI</div>
+                  {intel.recommendations.map((item, index) => (
+                    <div key={index} style={{ fontSize: 12, color: '#94b4c8', marginBottom: 6 }}>{item}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Panel>
+        )}
+
+        {(behavior || prediction) && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <Panel title="BEHAVIOR ANALYSIS" color={threatLevelColor(behavior?.threat_level)}>
+              <div className="panel-body">
+                {!behavior && <div style={{ color:'#4a6a84' }}>Behavior natija hali yo&apos;q.</div>}
+                {behavior && (
+                  <>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginBottom:12 }}>
+                      {[
+                        ['Threat', behavior.threat_level, threatLevelColor(behavior.threat_level)],
+                        ['Attack', behavior.attack_type, '#00e5ff'],
+                        ['Confidence', `${behavior.confidence}%`, '#9fc2ea'],
+                      ].map(([label, value, color]) => (
+                        <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                          <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
+                          <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:15 }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display:'grid', gap:8 }}>
+                      {(behavior.signals || []).map(item => (
+                        <div key={item} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(0,229,255,.03)', color:'#94b4c8', fontSize:12 }}>{item}</div>
+                      ))}
+                    </div>
+                    {behavior.features && (
+                      <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                        {Object.entries(behavior.features).slice(0, 6).map(([key, value]) => (
+                          <div key={key} style={{ display:'flex', justifyContent:'space-between', padding:'8px 10px', border:'1px solid var(--border2)', background:'rgba(255,255,255,.02)', fontSize:12 }}>
+                            <span style={{ color:'#4a6a84' }}>{key}</span>
+                            <span style={{ color:'#9fc2ea', fontFamily:'Share Tech Mono' }}>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </Panel>
+
+            <Panel title="THREAT PREDICTION" color={threatLevelColor(prediction?.predicted_threat_level)}>
+              <div className="panel-body">
+                {!prediction && <div style={{ color:'#4a6a84' }}>Prediction natija hali yo&apos;q.</div>}
+                {prediction && (
+                  <>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginBottom:12 }}>
+                      {[
+                        ['Level', prediction.predicted_threat_level, threatLevelColor(prediction.predicted_threat_level)],
+                        ['Attack', prediction.predicted_attack_type, '#00e5ff'],
+                        ['Confidence', `${prediction.confidence}%`, '#9fc2ea'],
+                      ].map(([label, value, color]) => (
+                        <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                          <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
+                          <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:15 }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display:'grid', gap:8 }}>
+                      {(prediction.reasoning || []).map(item => (
+                        <div key={item} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(57,255,20,.04)', color:'#94b4c8', fontSize:12 }}>{item}</div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Panel>
+          </div>
+        )}
+
         {loading && (
           <Panel title="TAHLIL QILINMOQDA..." color="#00e5ff">
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 60, gap: 16 }}>
@@ -1308,24 +2076,17 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
         {result && !loading && (
           <Panel title="TAHLIL NATIJASI" color={sevColor(result.severity)}>
             <div className="panel-body">
-              <div style={{
-                background: `${sevColor(result.severity)}11`, border: `1px solid ${sevColor(result.severity)}44`,
-                padding: 16, marginBottom: 16,
-              }}>
+              <div style={{ background: `${sevColor(result.severity)}11`, border: `1px solid ${sevColor(result.severity)}44`, padding: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                   <Badge sev={result.severity}/>
-                  <span style={{ fontFamily: 'Orbitron,monospace', fontSize: 22, color: sevColor(result.severity), fontWeight: 700 }}>
-                    {result.probability_pct}
-                  </span>
+                  <span style={{ fontFamily: 'Orbitron,monospace', fontSize: 22, color: sevColor(result.severity), fontWeight: 700 }}>{result.probability_pct}</span>
                   <span style={{ color: 'var(--text)', fontSize: 15, fontWeight: 600 }}>{result.threat_name}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
                   <div><span style={{ color: '#4a6a84' }}>IP: </span><span style={{ fontFamily: 'Share Tech Mono', color: '#00e5ff' }}>{result.ip}</span></div>
                   <div><span style={{ color: '#4a6a84' }}>Qurilma: </span><span>{result.ip_info?.device_name}</span></div>
                   <div><span style={{ color: '#4a6a84' }}>Tarmoq: </span><span>{result.ip_info?.network_type}</span></div>
-                  <div><span style={{ color: '#4a6a84' }}>Tur: </span><span style={{ fontFamily: 'Share Tech Mono', color: result.ip_info?.is_local ? '#39ff14' : '#ffab00' }}>
-                    {result.ip_info?.is_local ? 'LOCAL' : 'PUBLIC'}
-                  </span></div>
+                  <div><span style={{ color: '#4a6a84' }}>Tur: </span><span style={{ fontFamily: 'Share Tech Mono', color: result.ip_info?.is_local ? '#39ff14' : '#ffab00' }}>{result.ip_info?.is_local ? 'LOCAL' : 'PUBLIC'}</span></div>
                 </div>
               </div>
 
@@ -1334,7 +2095,7 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
                   <div className="panel-title" style={{ marginBottom: 10 }}>BELGILAR</div>
                   {result.indicators?.map((x, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                      <span style={{ color: '#00e5ff', fontFamily: 'Share Tech Mono', fontSize: 10, minWidth: 24 }}>[{String(i+1).padStart(2,'0')}]</span>
+                      <span style={{ color: '#00e5ff', fontFamily: 'Share Tech Mono', fontSize: 10, minWidth: 24 }}>[{String(i + 1).padStart(2, '0')}]</span>
                       <span style={{ fontSize: 13, color: '#94b4c8' }}>{x}</span>
                     </div>
                   ))}
@@ -1343,7 +2104,7 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
                   <div className="panel-title" style={{ marginBottom: 10 }}>CHORALAR</div>
                   {result.mitigation?.map((x, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, padding: '8px 10px', border: '1px solid var(--border2)', background: 'rgba(0,229,255,.02)' }}>
-                      <span style={{ fontFamily: 'Orbitron,monospace', fontSize: 10, color: '#00e5ff', minWidth: 22 }}>{String(i+1).padStart(2,'0')}</span>
+                      <span style={{ fontFamily: 'Orbitron,monospace', fontSize: 10, color: '#00e5ff', minWidth: 22 }}>{String(i + 1).padStart(2, '0')}</span>
                       <span style={{ fontSize: 12, color: '#94b4c8' }}>{x}</span>
                     </div>
                   ))}
@@ -1351,17 +2112,28 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
               </div>
 
               {result.algorithm_scores && (
-                <div>
-                  <div className="panel-title" style={{ marginBottom: 10 }}>ALGORITM BALLARI</div>
-                  {Object.entries(result.algorithm_scores).map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                      <span style={{ minWidth: 130, fontSize: 13, color: '#94b4c8' }}>{k}</span>
-                      <div style={{ flex: 1, height: 4, background: 'var(--border2)' }}>
-                        <div style={{ width: `${Math.round(v * 100)}%`, height: '100%', background: 'linear-gradient(90deg,var(--cyan2),var(--cyan))' }}/>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
+                  <div>
+                    <div className="panel-title" style={{ marginBottom: 10 }}>ALGORITM BALLARI</div>
+                    {Object.entries(result.algorithm_scores).map(([k, v]) => (
+                      <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                        <span style={{ minWidth: 130, fontSize: 13, color: '#94b4c8' }}>{k}</span>
+                        <div style={{ flex: 1, height: 4, background: 'var(--border2)' }}>
+                          <div style={{ width: `${Math.round(v * 100)}%`, height: '100%', background: 'linear-gradient(90deg,var(--cyan2),var(--cyan))' }}/>
+                        </div>
+                        <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#00e5ff', minWidth: 40 }}>{Math.round(v * 100)}%</span>
                       </div>
-                      <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#00e5ff', minWidth: 40 }}>{Math.round(v * 100)}%</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <div style={{ border: '1px solid var(--border2)', padding: 12, background: 'rgba(13,27,46,.42)' }}>
+                    <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 8 }}>TELEMETRY</div>
+                    {Object.entries(result.telemetry || {}).slice(0, 6).map(([key, value]) => (
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12 }}>
+                        <span style={{ color: '#4a6a84' }}>{key}</span>
+                        <span style={{ color: '#9fc2ea', fontFamily: 'Share Tech Mono' }}>{Array.isArray(value) ? value.join(', ') || '-' : String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1375,12 +2147,12 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
           </Panel>
         )}
 
-        {!result && !loading && (
+        {!result && !loading && !intel && (
           <Panel title="TAHLIL KUTILMOQDA" color="#4a6a84">
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 80, gap: 16 }}>
               <span style={{ fontSize: 64, opacity: .15 }}>[ ]</span>
               <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#4a6a84', letterSpacing: 2, textAlign: 'center' }}>
-                CHAP TARAFDAN IP MANZIL VA TAHDID TURINI TANLANG
+                TARGET YOKI IP KIRITING, SAFE PROBE QILING, SO&apos;NG THREAT TAHLILNI BOSHLANG
               </span>
             </div>
           </Panel>
@@ -1392,7 +2164,9 @@ function AnalyzePage({ initialIP, initialContext = '', initialThreat = '' }) {
 
 // ── LOGS PAGE ──────────────────────────────────────────────────────────────
 function LogsPage() {
+  const { logs: liveLogs, events, connected } = useLiveFeed();
   const [logs, setLogs]     = useState([]);
+  const [trafficLogs, setTrafficLogs] = useState([]);
   const [paused, setPaused] = useState(false);
   const logRef = useRef();
 
@@ -1400,16 +2174,27 @@ function LogsPage() {
     const fetchLogs = async () => {
       if (paused) return;
       try {
-        const d = await api.getLiveLogs();
-        setLogs(d.logs || []);
+        const [live, traffic] = await Promise.all([
+          api.getLiveLogs(),
+          api.getTrafficLogs(),
+        ]);
+        setLogs(live.logs || []);
+        setTrafficLogs(traffic.results || traffic || []);
       } catch {
         setLogs([]);
+        setTrafficLogs([]);
       }
     };
     fetchLogs();
-    const id = setInterval(fetchLogs, 1800);
+    const id = setInterval(fetchLogs, 4000);
     return () => clearInterval(id);
   }, [paused]);
+
+  useEffect(() => {
+    if (!paused && liveLogs.length) {
+      setLogs(liveLogs);
+    }
+  }, [liveLogs, paused]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = 0;
@@ -1422,6 +2207,9 @@ function LogsPage() {
       <Panel title="REAL VAQT LOG OQIMI" color="#39ff14"
         extra={
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <span style={{ alignSelf:'center', color: connected ? '#39ff14' : '#ffab00', fontFamily:'Share Tech Mono', fontSize:10 }}>
+              {connected ? 'WS LIVE' : 'POLL MODE'}
+            </span>
             <button className="action-btn" onClick={() => setPaused(p => !p)}
               style={{ color: paused ? '#ffab00' : 'var(--text-dim)', borderColor: paused ? 'rgba(255,171,0,.5)' : 'var(--border)' }}>
               {paused ? 'DAVOM' : 'PAUZA'}
@@ -1508,11 +2296,23 @@ function InsightsPage({ initialTab = 'threats' }) {
               <div style={{ background: `${sevColor(selThreat?.sev)}0d`, border: `1px solid ${sevColor(selThreat?.sev)}33`, padding: 16, marginBottom: 16 }}>
                 <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7 }}>{selThreat?.desc}</p>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
+                {[
+                  ['Severity', selThreat?.sev?.toUpperCase(), sevColor(selThreat?.sev)],
+                  ['Detectability', `${selThreat?.metrics?.detect || 0}%`, '#00e5ff'],
+                  ['Business Impact', `${selThreat?.metrics?.business || 0}%`, '#ffab00'],
+                ].map(([label, value, tone]) => (
+                  <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+                    <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>{label}</div>
+                    <div style={{ color: tone, fontFamily: 'Orbitron,monospace', fontSize: 18 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
               <div style={{ marginBottom: 16 }}>
                 <div className="panel-title" style={{ marginBottom: 8 }}>ALOMATLAR</div>
                 <p style={{ fontSize: 13, color: '#94b4c8', lineHeight: 1.7 }}>{selThreat?.signs}</p>
               </div>
-              <div>
+              <div style={{ marginBottom: 16 }}>
                 <div className="panel-title" style={{ marginBottom: 8 }}>AI YONDASHUVI</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {selThreat?.algo?.split(', ').map(a => (
@@ -1520,6 +2320,7 @@ function InsightsPage({ initialTab = 'threats' }) {
                   ))}
                 </div>
               </div>
+              <ThreatFlowPanel threat={selThreat} color={sevColor(selThreat?.sev)}/>
             </div>
           </Panel>
         </div>
@@ -1553,10 +2354,63 @@ function InsightsPage({ initialTab = 'threats' }) {
               <div style={{ fontFamily: 'Orbitron,monospace', fontSize: 16, fontWeight: 700, color: algoColor(selAlgo?.type), marginBottom: 4 }}>{selAlgo?.name}</div>
               <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: 'var(--text-dim)', marginBottom: 14 }}>{selAlgo?.type} · {selAlgo?.sub}</div>
               <p style={{ fontSize: 13, color: '#94b4c8', lineHeight: 1.7, marginBottom: 16 }}>{selAlgo?.desc}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                {[
+                  ['Speed', ALGO_VISUAL_METRICS[selAlgo?.key]?.speed, '#39ff14'],
+                  ['Explain', ALGO_VISUAL_METRICS[selAlgo?.key]?.explain, '#ffab00'],
+                  ['Zero-day', ALGO_VISUAL_METRICS[selAlgo?.key]?.zeroDay, '#ff1744'],
+                  ['Stream', ALGO_VISUAL_METRICS[selAlgo?.key]?.stream, '#9fc2ea'],
+                ].map(([label, value, color]) => (
+                  <div key={label} style={{ padding: 10, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.4)' }}>
+                    <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>{label}</div>
+                    <div style={{ color, fontFamily: 'Orbitron,monospace', fontSize: 18 }}>{value}%</div>
+                  </div>
+                ))}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderTop: '1px solid var(--border2)' }}>
                 <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Aniqlik</span>
                 <span style={{ fontFamily: 'Orbitron,monospace', fontSize: 20, color: algoColor(selAlgo?.type) }}>{selAlgo?.acc}%</span>
               </div>
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {tab === 'algorithms' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+          <Panel title="MODEL FIT" color="#39ff14">
+            <div className="panel-body">
+              {THREATS_LIST.map(item => {
+                const threatFit = Math.max(38, Math.min(98, Math.round((selAlgo?.acc || 0) - (item.v === 'zero_day' ? 8 : 0) + (item.v === 'ddos' && selAlgo?.key === 'iso' ? 7 : 0) + (item.v === 'apt' && selAlgo?.key === 'lstm' ? 5 : 0))));
+                return (
+                  <div key={item.v} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4, fontSize: 12 }}>
+                      <span style={{ color: '#94b4c8' }}>{item.l}</span>
+                      <span style={{ color: '#39ff14', fontFamily: 'Share Tech Mono' }}>{threatFit}%</span>
+                    </div>
+                    <div style={{ height: 4, background: 'var(--border2)' }}>
+                      <div style={{ width: `${threatFit}%`, height: '100%', background: 'linear-gradient(90deg,#39ff14,#9fc2ea)' }}/>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 16 }}>
+                {Object.entries(ALGO_VISUAL_METRICS[selAlgo?.key] || {}).map(([metric, value]) => (
+                  <div key={metric} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ minWidth: 120, color: '#94b4c8', fontSize: 12 }}>{metric}</span>
+                    <div style={{ flex: 1, height: 6, background: 'var(--border2)' }}>
+                      <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${algoColor(selAlgo?.type)}, rgba(255,255,255,.9))` }}/>
+                    </div>
+                    <span style={{ minWidth: 36, color: '#9fc2ea', fontFamily: 'Share Tech Mono', fontSize: 11 }}>{value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="GLOBAL THREAT MAP" color="#ff1744">
+            <div className="panel-body">
+              <GlobalThreatMapPanel compact/>
             </div>
           </Panel>
         </div>
@@ -1601,7 +2455,12 @@ function InsightsPage({ initialTab = 'threats' }) {
           </Panel>
           <Panel title={selSiem?.name?.toUpperCase() || ''} color="#00e5ff">
             <div className="panel-body">
-              <p style={{ fontSize: 14, color: '#94b4c8', lineHeight: 1.8 }}>{selSiem?.detail}</p>
+              <div style={{ marginBottom: 14, padding: 14, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{selSiem?.name}</div>
+                <div style={{ fontSize: 11, color: '#7ab8d4', fontFamily: 'Share Tech Mono', marginBottom: 10 }}>{selSiem?.best}</div>
+                <p style={{ fontSize: 14, color: '#94b4c8', lineHeight: 1.8 }}>{selSiem?.detail}</p>
+              </div>
+              <SIEMArchitecturePanel tool={selSiem}/>
             </div>
           </Panel>
         </div>
@@ -1644,6 +2503,9 @@ function SIEMPage() {
             <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{selected.name}</div>
             <div style={{ fontSize: 12, color: '#7ab8d4', fontFamily: 'Share Tech Mono', marginBottom: 14 }}>{selected.best}</div>
             <div style={{ fontSize: 14, color: '#a5c2d8', lineHeight: 1.8 }}>{selected.detail}</div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <SIEMArchitecturePanel tool={selected}/>
           </div>
         </div>
       </Panel>
@@ -1698,7 +2560,9 @@ function SIEMPage() {
 
 function TopologyPage() {
   const [scenarioKey, setScenarioKey] = useState('normal');
+  const [guideKey, setGuideKey] = useState('star');
   const scenario = TOPOLOGY_SCENARIOS[scenarioKey];
+  const guide = NETWORK_TYPE_GUIDES.find(item => item.key === guideKey) || NETWORK_TYPE_GUIDES[0];
   const nodeMap = Object.fromEntries(TOPOLOGY_NODES.map(node => [node.key, node]));
   const stateStyle = state => ({
     ok: { color:'#6bd214', width:2.2 },
@@ -1715,13 +2579,22 @@ function TopologyPage() {
     internal: { border:'rgba(189,232,153,.5)', bg:'rgba(189,232,153,.12)', color:'#ebf8dc' },
     observer: { border:'rgba(138,124,245,.65)', bg:'rgba(138,124,245,.14)', color:'#e3dcff' },
   }[tone]);
+  const packetCount = scenarioKey === 'attack' ? 8 : scenarioKey === 'blocked' ? 3 : 5;
 
   return (
     <div style={{ animation: 'fadeUp .3s ease', display: 'grid', gap: 14 }}>
       <Panel title="TARMOQ TOPOLOGIYASI" color="#39ff14">
         <div className="panel-body">
-          <div style={{ position: 'relative', minHeight: 380, border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(13,27,46,.7), rgba(3,7,18,.95))', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', minHeight: 430, border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(17,34,58,.78), rgba(3,7,18,.98))', overflow: 'hidden', perspective: 1200 }}>
+            <div style={{ position:'absolute', inset:18, border:'1px solid rgba(0,229,255,.08)', transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:'0 0 80px rgba(0,229,255,.04) inset' }}/>
+            <div style={{ position:'absolute', inset:'10% 8%', background:'linear-gradient(180deg, rgba(0,229,255,.03), transparent)', transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
             <svg viewBox="0 0 100 100" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
+              {[...Array(9)].map((_, index) => (
+                <line key={`grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(34,71,110,.22)" strokeWidth="0.15"/>
+              ))}
+              {[...Array(5)].map((_, index) => (
+                <line key={`grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(34,71,110,.18)" strokeWidth="0.15"/>
+              ))}
               {TOPOLOGY_EDGES.map(edge => {
                 const from = nodeMap[edge.from];
                 const to = nodeMap[edge.to];
@@ -1740,6 +2613,16 @@ function TopologyPage() {
                   />
                 );
               })}
+              {TOPOLOGY_EDGES.filter(edge => scenario.linkStates[edge.key] !== 'idle').map((edge, edgeIndex) => {
+                const from = nodeMap[edge.from];
+                const to = nodeMap[edge.to];
+                const style = stateStyle(scenario.linkStates[edge.key]);
+                return [...Array(Math.max(1, Math.floor(packetCount / 3)))].map((_, index) => (
+                  <circle key={`${edge.key}-${index}`} r="0.7" fill={style.color} style={{ filter:`drop-shadow(0 0 6px ${style.color})`, animation:`packetTravel ${2.2 + index * .35}s linear ${(edgeIndex * .18) + index * .3}s infinite` }}>
+                    <animateMotion dur={`${2.2 + index * .35}s`} begin={`${(edgeIndex * .18) + index * .3}s`} repeatCount="indefinite" path={`M ${from.x} ${from.y} L ${to.x} ${to.y}`}/>
+                  </circle>
+                ));
+              })}
             </svg>
             {TOPOLOGY_NODES.map(node => {
               const tone = nodeTone(node.tone);
@@ -1752,18 +2635,61 @@ function TopologyPage() {
                   minHeight:44,
                   padding:'10px 8px',
                   border:`1px solid ${tone.border}`,
-                  background:tone.bg,
+                  background:`linear-gradient(180deg, ${tone.bg}, rgba(3,7,18,.92))`,
                   color:tone.color,
                   textAlign:'center',
                   fontSize:12,
                   lineHeight:1.35,
-                  boxShadow:`0 0 20px ${tone.bg}`,
+                  boxShadow:`0 14px 32px rgba(0,0,0,.28), 0 0 20px ${tone.bg}`,
                   whiteSpace:'pre-line',
+                  transform:'translateZ(28px)',
+                  animation:'float3d 5.5s ease-in-out infinite',
                 }}>
                   {node.label}
                 </div>
               );
             })}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1.2fr .8fr', gap:12, marginTop: 14 }}>
+            <div style={{ border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', padding:14 }}>
+              <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>TOPOLOGY TYPE GUIDE</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom: 12 }}>
+                {NETWORK_TYPE_GUIDES.map(item => (
+                  <button key={item.key} className={`filter-btn${guideKey === item.key ? ' active' : ''}`} onClick={() => setGuideKey(item.key)}>
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <div style={{ fontSize:18, color:'#dce8f5', fontWeight:700, marginBottom:6 }}>{guide.name}</div>
+                  <div style={{ fontSize:11, color:'#7ab8d4', fontFamily:'Share Tech Mono', marginBottom:10 }}>{guide.fit}</div>
+                  <div style={{ fontSize:13, color:'#a5c2d8', lineHeight:1.7 }}>{guide.summary}</div>
+                </div>
+                <div style={{ display:'grid', gap:8 }}>
+                  {guide.pros.map(point => (
+                    <div key={point} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(159,194,234,.08)', color:'#d5e5f6', fontSize:12 }}>
+                      {point}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', padding:14 }}>
+              <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>LIVE SCENE METRICS</div>
+              {[
+                ['Nodes', Object.keys(nodeMap).length, '#00e5ff'],
+                ['Active links', Object.values(scenario.linkStates).filter(value => value !== 'idle').length, '#39ff14'],
+                ['Threat intensity', scenarioKey === 'attack' ? '92%' : scenarioKey === 'blocked' ? '26%' : '14%', scenarioKey === 'attack' ? '#ff1744' : scenarioKey === 'blocked' ? '#ffab00' : '#9fc2ea'],
+                ['Monitoring mode', guide.name, '#dce8f5'],
+              ].map(([label, value, color]) => (
+                <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:10, padding:'10px 0', borderBottom:'1px solid var(--border2)', fontSize:12 }}>
+                  <span style={{ color:'#4a6a84' }}>{label}</span>
+                  <span style={{ color, fontFamily:'Share Tech Mono' }}>{value}</span>
+                </div>
+              ))}
+            </div>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop: 14 }}>
             {Object.entries(TOPOLOGY_SCENARIOS).map(([key, item]) => (
@@ -1774,9 +2700,57 @@ function TopologyPage() {
           </div>
           <div style={{ marginTop: 12, padding: 14, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', color:'#a5c2d8', fontSize:13, lineHeight:1.8 }}>
             {scenario.summary}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:12, marginTop:12 }}>
+              {[
+                ['Ingress', scenario.linkStates.ingress, stateStyle(scenario.linkStates.ingress).color],
+                ['Core services', `${['web','db','mail'].filter(key => scenario.linkStates[key] !== 'ok').length || 0} ta alert`, '#9fc2ea'],
+                ['AI telemetry', scenario.linkStates.telemetry, '#a78bfa'],
+              ].map(([label, value, tone]) => (
+                <div key={label} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
+                  <div style={{ color:'#4a6a84', fontSize:10, letterSpacing:2, marginBottom:5 }}>{label}</div>
+                  <div style={{ color:tone, fontFamily:'Orbitron,monospace', fontSize:15 }}>{String(value).toUpperCase()}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </Panel>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
+        <Panel title="EVENT BUS" color="#00e5ff">
+          <div className="panel-body" style={{ maxHeight: 260, overflowY:'auto', display:'grid', gap:8 }}>
+            {(events.length ? events : [{ kind:'system', timestamp:new Date().toISOString(), payload:{ message:'Realtime eventlar kutilmoqda' } }]).slice(0, 12).map((event, index) => (
+              <div key={`${event.kind}-${event.timestamp}-${index}`} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:8, marginBottom:6 }}>
+                  <span style={{ color:'#00e5ff', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(event.kind || 'event').toUpperCase()}</span>
+                  <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(event.timestamp)}</span>
+                </div>
+                <div style={{ color:'#94b4c8', fontSize:12, lineHeight:1.6 }}>
+                  {event.payload?.attack_type || event.payload?.summary || event.payload?.message || event.payload?.ip || 'Event'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="SIMULATED / STORED TRAFFIC LOGS" color="#ffab00">
+          <div className="panel-body" style={{ maxHeight: 260, overflowY:'auto', display:'grid', gap:8 }}>
+            {(trafficLogs || []).slice(0, 12).map(item => (
+              <div key={item.id} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(255,171,0,.05)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:10, marginBottom:6 }}>
+                  <span style={{ color:'#ffab00', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(item.traffic_type || '-').toUpperCase()}</span>
+                  <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(item.created_at)}</span>
+                </div>
+                <div style={{ color:'#9fc2ea', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{item.ip_address}:{item.port}</div>
+                <div style={{ color:'#94b4c8', fontSize:12 }}>
+                  req={item.request_count} | failed={item.failed_attempts} | freq={item.connection_frequency}
+                </div>
+              </div>
+            ))}
+            {trafficLogs.length === 0 && <span style={{ color:'#4a6a84' }}>Traffic simulation loglari hali yo&apos;q...</span>}
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }
