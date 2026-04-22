@@ -1,45 +1,60 @@
-import random
-from django.conf import settings
-from django.utils import timezone
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
+from django.utils import timezone
 
-from .models import ThreatLog, BlockedIP, NetworkDevice
-from .serializers import ThreatLogSerializer, BlockedIPSerializer, NetworkDeviceSerializer, AnalyzeRequestSerializer
-from .services import analyze_threat, classify_ip, get_dashboard_stats, THREAT_SIGNATURES
+from .models import BlockedIP, ConnectionProfile, NetworkDevice, ScanSession, ThreatLog
+from .network_services import connect_to_wifi, encrypt_secret, get_wifi_status, list_network_interfaces, run_profile_scan
+from .serializers import (
+    AnalyzeRequestSerializer,
+    AnalyzeResponseSerializer,
+    BlockedIPSerializer,
+    ConnectionProfileSerializer,
+    ConnectionProfileWriteSerializer,
+    DashboardStatsSerializer,
+    IPReputationSerializer,
+    LiveLogsResponseSerializer,
+    NetworkDeviceSerializer,
+    NetworkInterfacesResponseSerializer,
+    NetworkScanResponseSerializer,
+    RunScanRequestSerializer,
+    ScanSessionSerializer,
+    ThreatLogSerializer,
+    WifiConnectRequestSerializer,
+    WifiStatusSerializer,
+)
+from .services import (
+    analyze_threat,
+    build_live_logs,
+    discover_local_devices,
+    get_dashboard_stats,
+    get_ip_reputation,
+)
 
 
 # ---------------------------------------------------------------
 # Dashboard statistikasi
 # ---------------------------------------------------------------
+@extend_schema(
+    tags=['Dashboard'],
+    responses=DashboardStatsSerializer,
+)
 @api_view(['GET'])
 def dashboard_stats(request):
     logs = ThreatLog.objects.all()
     stats = get_dashboard_stats(logs)
-
-    # Soatlik trend (oxirgi 12 soat)
-    hourly = []
-    for i in range(12):
-        hourly.append({
-            'hour': f"{str(i*2).zfill(2)}:00",
-            'threats': random.randint(5, 70),
-            'blocked': random.randint(3, 55),
-        })
-
-    return Response({
-        **stats,
-        'accuracy': 96.4,
-        'f1_score': 0.949,
-        'response_ms': 12,
-        'false_positive_rate': 3.6,
-        'hourly_trend': hourly,
-    })
+    return Response(stats)
 
 
 # ---------------------------------------------------------------
 # IP tahlil qilish — asosiy endpoint
 # ---------------------------------------------------------------
+@extend_schema(
+    tags=['Analysis'],
+    request=AnalyzeRequestSerializer,
+    responses={200: AnalyzeResponseSerializer},
+)
 @api_view(['POST'])
 def analyze_ip(request):
     ser = AnalyzeRequestSerializer(data=request.data)
@@ -74,85 +89,88 @@ def analyze_ip(request):
 
 
 # ---------------------------------------------------------------
-# Local tarmoq qurilmalarini skanerlash (demo)
+# Local tarmoq qurilmalarini skanerlash
 # ---------------------------------------------------------------
+@extend_schema(
+    tags=['Network'],
+    responses=NetworkScanResponseSerializer,
+)
 @api_view(['GET'])
 def scan_local_network(request):
-    """
-    Demo: settings.LOCAL_DEMO_IPS ro'yxatini qaytaradi.
-    Haqiqiy loyihada: python-nmap yoki scapy ishlatiladi.
-    """
-    devices = []
-    for ip, info in settings.LOCAL_DEMO_IPS.items():
-        ip_data = classify_ip(ip)
-        devices.append({
-            'ip': ip,
-            'name': info['name'],
-            'mac': info['mac'],
-            'risk': info['risk'],
-            'network_type': ip_data['network_type'],
-            'status': 'online' if random.random() > 0.2 else 'offline',
-            'open_ports': _demo_open_ports(info['risk']),
-            'last_seen': timezone.now().isoformat(),
-        })
+    devices = discover_local_devices()
+
+    for device in devices:
+        NetworkDevice.objects.update_or_create(
+            ip_address=device['ip'],
+            defaults={
+                'mac_address': device.get('mac', '')[:17],
+                'device_name': device['name'][:100],
+                'risk_level': device['risk'],
+                'is_trusted': device['risk'] in ('low', 'medium'),
+            },
+        )
+
     return Response({'devices': devices, 'total': len(devices)})
 
 
-def _demo_open_ports(risk: str) -> list:
-    base = [22, 80, 443]
-    if risk in ('high', 'critical'):
-        base += random.sample([8080, 3389, 21, 23, 445, 1433, 3306], k=random.randint(2, 4))
-    return sorted(base)
+@extend_schema(
+    tags=['Network'],
+    responses=NetworkInterfacesResponseSerializer,
+)
+@api_view(['GET'])
+def network_interfaces(request):
+    interfaces = list_network_interfaces()
+    return Response({'interfaces': interfaces, 'total': len(interfaces)})
+
+
+@extend_schema(
+    tags=['Network'],
+    responses=WifiStatusSerializer,
+)
+@api_view(['GET'])
+def wifi_status(request):
+    return Response(get_wifi_status())
+
+
+@extend_schema(
+    tags=['Network'],
+    request=WifiConnectRequestSerializer,
+    responses=WifiStatusSerializer,
+)
+@api_view(['POST'])
+def wifi_connect(request):
+    serializer = WifiConnectRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        data = connect_to_wifi(**serializer.validated_data)
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ---------------------------------------------------------------
 # IP reputatsiyasi (AbuseIPDB — faqat public IP lar uchun)
 # ---------------------------------------------------------------
+@extend_schema(
+    tags=['Reputation'],
+    parameters=[
+        OpenApiParameter(
+            name='ip',
+            location=OpenApiParameter.PATH,
+            required=True,
+            type=str,
+            description='Tekshiriladigan IP manzil',
+        )
+    ],
+    responses=IPReputationSerializer,
+)
 @api_view(['GET'])
 def ip_reputation(request, ip):
-    ip_info = classify_ip(ip)
-    if not ip_info['valid']:
-        return Response({'error': 'Noto\'g\'ri IP'}, status=400)
-
-    if ip_info['is_local']:
-        return Response({
-            'ip': ip,
-            'is_local': True,
-            'message': 'Local IP — AbuseIPDB faqat public IP lar uchun ishlaydi.',
-            'local_info': ip_info,
-            'abuse_score': 0,
-            'reports': 0,
-        })
-
-    # Public IP — AbuseIPDB so'rov (real API key kerak)
-    api_key = settings.ABUSEIPDB_API_KEY
-    if api_key == 'YOUR_API_KEY_HERE':
-        return Response({
-            'ip': ip,
-            'is_local': False,
-            'message': 'AbuseIPDB API key sozlanmagan. settings.py da ABUSEIPDB_API_KEY ni kiriting.',
-            'demo_abuse_score': random.randint(0, 100),
-        })
-
     try:
-        import requests
-        resp = requests.get(
-            'https://api.abuseipdb.com/api/v2/check',
-            headers={'Key': api_key, 'Accept': 'application/json'},
-            params={'ipAddress': ip, 'maxAgeInDays': 90},
-            timeout=5,
-        )
-        data = resp.json().get('data', {})
-        return Response({
-            'ip': ip,
-            'is_local': False,
-            'abuse_score': data.get('abuseConfidenceScore', 0),
-            'reports': data.get('totalReports', 0),
-            'country': data.get('countryCode', 'N/A'),
-            'isp': data.get('isp', 'N/A'),
-            'domain': data.get('domain', 'N/A'),
-            'last_reported': data.get('lastReportedAt', 'N/A'),
-        })
+        data = get_ip_reputation(ip)
+        if 'error' in data:
+            return Response(data, status=400)
+        return Response(data)
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 
@@ -184,29 +202,80 @@ class BlockedIPViewSet(viewsets.ModelViewSet):
     serializer_class = BlockedIPSerializer
 
 
+class ConnectionProfileViewSet(viewsets.ModelViewSet):
+    queryset = ConnectionProfile.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ('create', 'update', 'partial_update'):
+            return ConnectionProfileWriteSerializer
+        return ConnectionProfileSerializer
+
+    def perform_create(self, serializer):
+        secret = serializer.validated_data.pop('secret', '')
+        serializer.save(secret_encrypted=encrypt_secret(secret))
+
+    def perform_update(self, serializer):
+        secret = serializer.validated_data.pop('secret', None)
+        instance = serializer.save()
+        if secret is not None:
+            instance.secret_encrypted = encrypt_secret(secret)
+            instance.save(update_fields=['secret_encrypted', 'updated_at'])
+
+    @extend_schema(
+        request=RunScanRequestSerializer,
+        responses=ScanSessionSerializer,
+    )
+    @action(detail=True, methods=['post'])
+    def scan(self, request, pk=None):
+        profile = self.get_object()
+        serializer = RunScanRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        session = ScanSession.objects.create(
+            profile=profile,
+            status='running',
+            network_name=payload.get('network_name', ''),
+            interface_name=payload.get('interface_name', ''),
+            started_at=timezone.now(),
+        )
+
+        try:
+            result = run_profile_scan(
+                profile,
+                interface_name=payload.get('interface_name', ''),
+                network_name=payload.get('network_name', ''),
+            )
+            session.status = 'success'
+            session.summary = result.get('hostname') or result.get('device_description') or f'{profile.profile_type.upper()} scan bajarildi'
+            session.result = result
+            profile.last_used_at = timezone.now()
+            profile.save(update_fields=['last_used_at'])
+        except Exception as exc:
+            session.status = 'failed'
+            partial_result = getattr(exc, 'result', {}) or {}
+            session.summary = partial_result.get('summary') or partial_result.get('hostname') or 'Scan xatolik bilan tugadi'
+            session.result = partial_result
+            session.error_message = str(exc)
+
+        session.finished_at = timezone.now()
+        session.save()
+        return Response(ScanSessionSerializer(session).data)
+
+
+class ScanSessionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ScanSession.objects.select_related('profile').all()[:100]
+    serializer_class = ScanSessionSerializer
+
+
 # ---------------------------------------------------------------
-# Real vaqt log generatsiya (demo stream)
+# Real vaqt log oqimi
 # ---------------------------------------------------------------
+@extend_schema(
+    tags=['Logs'],
+    responses=LiveLogsResponseSerializer,
+)
 @api_view(['GET'])
 def live_logs(request):
-    log_templates = [
-        {'level': 'info',  'msg': 'Tarmoq trafigi normal — 2.3 Gbps'},
-        {'level': 'warn',  'msg': f"Noodatiy so'rov: {random.choice(list(settings.LOCAL_DEMO_IPS.keys()))} — {random.randint(100,1500)}/min"},
-        {'level': 'error', 'msg': f"SQL Injection bloklandi — src: {random.choice(list(settings.LOCAL_DEMO_IPS.keys()))}"},
-        {'level': 'info',  'msg': 'Autentifikatsiya muvaffaqiyatli'},
-        {'level': 'warn',  'msg': f"Port skanerlash: {random.choice(list(settings.LOCAL_DEMO_IPS.keys()))}"},
-        {'level': 'error', 'msg': 'Brute-force hujumi aniqlandi — 500+ urinish'},
-        {'level': 'info',  'msg': 'Firewall qoidalari yangilandi'},
-        {'level': 'warn',  'msg': 'DDoS anomaliya — trafik 4x yuqori'},
-    ]
-    logs = []
-    for i in range(10):
-        t = random.choice(log_templates)
-        logs.append({
-            'id': i,
-            'level': t['level'],
-            'message': t['msg'],
-            'timestamp': timezone.now().isoformat(),
-            'ip': random.choice(list(settings.LOCAL_DEMO_IPS.keys())),
-        })
+    logs = build_live_logs()
     return Response({'logs': logs})

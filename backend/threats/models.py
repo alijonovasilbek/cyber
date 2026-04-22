@@ -36,7 +36,7 @@ class ThreatLog(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.ip_address} — {self.threat_type} ({self.severity})"
+        return f"{self.ip_address} - {self.threat_type} ({self.severity})"
 
 
 class BlockedIP(models.Model):
@@ -59,3 +59,62 @@ class NetworkDevice(models.Model):
 
     def __str__(self):
         return f"{self.device_name} ({self.ip_address})"
+
+
+class ConnectionProfile(models.Model):
+    PROFILE_TYPES = [
+        ('ssh', 'SSH'),
+        ('telnet', 'Telnet'),
+        ('snmp', 'SNMP'),
+    ]
+    SNMP_VERSIONS = [
+        ('2c', 'SNMP v2c'),
+        ('3', 'SNMP v3'),
+    ]
+
+    name = models.CharField(max_length=100)
+    profile_type = models.CharField(max_length=20, choices=PROFILE_TYPES)
+    target_host = models.CharField(max_length=255)
+    port = models.PositiveIntegerField(default=22)
+    username = models.CharField(max_length=100, blank=True)
+    secret_encrypted = models.TextField(blank=True)
+    snmp_version = models.CharField(max_length=10, choices=SNMP_VERSIONS, default='2c')
+    network_label = models.CharField(max_length=120, blank=True)
+    notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name', 'target_host']
+
+    def __str__(self):
+        return f"{self.name} [{self.profile_type}] -> {self.target_host}:{self.port}"
+
+
+class ScanSession(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('running', 'Running'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+    ]
+
+    profile = models.ForeignKey(ConnectionProfile, on_delete=models.CASCADE, related_name='sessions')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    summary = models.CharField(max_length=255, blank=True)
+    network_name = models.CharField(max_length=120, blank=True)
+    interface_name = models.CharField(max_length=120, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    result = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Scan #{self.pk} {self.profile.name} ({self.status})"
+
