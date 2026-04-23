@@ -1,6 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from './services/api';
 
+function safeStorageGet(key, fallback = '') {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeStorageSet(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    return;
+  }
+}
+
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const THREATS_LIST = [
   {v:'ddos',l:'DDoS hujumi'},{v:'sqli',l:'SQL Injection'},{v:'brute_force',l:'Brute Force'},
@@ -824,6 +841,9 @@ function NetworkPage({ onAnalyze }) {
   const [devices, setDevices] = useState([]);
   const [interfaces, setInterfaces] = useState([]);
   const [wifiStatus, setWifiStatus] = useState(null);
+  const [agentMode, setAgentMode] = useState(false);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentError, setAgentError] = useState('');
   const [profiles, setProfiles] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -860,11 +880,12 @@ function NetworkPage({ onAnalyze }) {
   const [simBusy, setSimBusy] = useState(false);
   const [simResult, setSimResult] = useState(null);
 
-  const loadNetworkContext = useCallback(async () => {
-    try {
-      const [scanData, interfaceData, wifiData, profileData, sessionData] = await Promise.allSettled([
-        api.scanNetwork(),
-        api.getInterfaces(),
+    const loadNetworkContext = useCallback(async () => {
+      try {
+        setAgentMode(await api.hasLocalAgent(true));
+        const [scanData, interfaceData, wifiData, profileData, sessionData] = await Promise.allSettled([
+          api.scanNetwork(),
+          api.getInterfaces(),
         api.getWifiStatus(),
         api.getProfiles(),
         api.getScanSessions(),
@@ -906,10 +927,28 @@ function NetworkPage({ onAnalyze }) {
     }
   }, [selectedInterface]);
 
-  const scan = () => {
-    setScanning(true);
-    loadNetworkContext();
-  };
+    const scan = () => {
+      setScanning(true);
+      loadNetworkContext();
+    };
+
+    const enableLocalScan = async () => {
+      setAgentBusy(true);
+      setAgentError('');
+      try {
+        api.launchLocalAgent();
+        const ready = await api.waitForLocalAgent({ timeoutMs: 15000, intervalMs: 1000 });
+        if (!ready) {
+          throw new Error("Local agent topilmadi. Shu kompyuterda `install_local_scan_protocol.bat` ni bir marta ishga tushiring yoki `start_local_agent.bat` ni yoqing.");
+        }
+        setAgentMode(true);
+        await loadNetworkContext();
+      } catch (err) {
+        setAgentError(err.message || 'Local agent ishga tushmadi');
+      } finally {
+        setAgentBusy(false);
+      }
+    };
 
   const checkRep = async (ip) => {
     setSelected(ip);
@@ -1046,9 +1085,15 @@ function NetworkPage({ onAnalyze }) {
     }
   };
 
-  useEffect(() => { loadNetworkContext(); }, [loadNetworkContext]);
-  useEffect(() => {
-    if (!devices.length) return;
+    useEffect(() => { loadNetworkContext(); }, [loadNetworkContext]);
+    useEffect(() => {
+      const id = setInterval(async () => {
+        setAgentMode(await api.hasLocalAgent(true));
+      }, 4000);
+      return () => clearInterval(id);
+    }, []);
+    useEffect(() => {
+      if (!devices.length) return;
     const firstIp = selected || devices[0]?.ip || '';
     if (firstIp) {
       setSafeScanForm(form => form.ip ? form : { ...form, ip: firstIp });
@@ -1062,6 +1107,23 @@ function NetworkPage({ onAnalyze }) {
     risky: devices.filter(device => ['high', 'critical'].includes(device.risk)).length,
     exposed: devices.filter(device => (device.open_ports || []).length >= 4).length,
   };
+  const localScanSteps = [
+    {
+      title: '1. Birinchi sozlash',
+      text: 'Shu kompyuterda faqat bir marta local protocol o‘rnating.',
+      bat: 'install_local_scan_protocol.bat',
+    },
+    {
+      title: '2. Local agentni yoqing',
+      text: 'Agent shu kompyuterning Wi-Fi, interface va lokal hostlarini o‘qiydi.',
+      bat: 'start_local_agent.bat',
+    },
+    {
+      title: '3. Saytdan ishga tushiring',
+      text: 'RUN LOCAL SCAN bosilganda sayt localhost agentga ulanadi va server emas, shu kompyuter tarmog‘ini ishlatadi.',
+      bat: 'enable_local_scan.bat',
+    },
+  ];
   const inputStyle = {
     width: '100%',
     background: 'rgba(0,229,255,.04)',
@@ -1074,18 +1136,55 @@ function NetworkPage({ onAnalyze }) {
   };
 
   return (
-    <div style={{ animation: 'fadeUp .3s ease' }}>
-      <Panel title={`LOCAL TARMOQ SKANERI | ${devices.length} TOPILDI`} color="#00e5ff"
-        extra={
-          <button className="action-btn" style={{ marginLeft: 'auto' }} onClick={scan} disabled={scanning}>
-            {scanning ? 'SKANLANMOQDA...' : 'QAYTA SKAN'}
-          </button>
-        }>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>
-        ) : (
-          <div style={{ padding: 14 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginBottom: 12 }}>
+      <div style={{ animation: 'fadeUp .3s ease' }}>
+        <Panel title={`LOCAL TARMOQ SKANERI | ${devices.length} TOPILDI`} color="#00e5ff"
+          extra={
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginLeft:'auto' }}>
+              <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: agentMode ? '#39ff14' : '#ffab00' }}>
+                {agentMode ? 'LOCAL AGENT: ACTIVE' : 'LOCAL AGENT: OFF'}
+              </span>
+              {!agentMode && (
+                <button className="action-btn" onClick={enableLocalScan} disabled={agentBusy}>
+                  {agentBusy ? 'STARTING AGENT...' : 'RUN LOCAL SCAN'}
+                </button>
+              )}
+              <button className="action-btn" onClick={scan} disabled={scanning}>
+                {scanning ? 'SKANLANMOQDA...' : 'QAYTA SKAN'}
+              </button>
+            </div>
+          }>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>
+          ) : (
+            <div style={{ padding: 14 }}>
+              {!agentMode && (
+                <div style={{
+                  marginBottom: 12,
+                  padding: 12,
+                  border: '1px solid rgba(255,171,0,.35)',
+                  background: 'rgba(255,171,0,.06)',
+                  color: '#ffd37a',
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                }}>
+                  Shu kompyuter tarmog'ini ko'rish uchun local agent kerak. `RUN LOCAL SCAN` tugmasini bosing.
+                  Agar birinchi urinishda ishga tushmasa, shu kompyuterda `install_local_scan_protocol.bat` ni bir marta ishga tushiring.
+                </div>
+              )}
+              {agentError && (
+                <div style={{
+                  marginBottom: 12,
+                  padding: 12,
+                  border: '1px solid rgba(255,23,68,.35)',
+                  background: 'rgba(255,23,68,.06)',
+                  color: '#ff8fa0',
+                  fontSize: 12,
+                  lineHeight: 1.7,
+                }}>
+                  {agentError}
+                </div>
+              )}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginBottom: 12 }}>
               {[
                 ['Onlayn hostlar', `${deviceStats.online}/${devices.length}`, '#39ff14'],
                 ['Yuqori xavf', `${deviceStats.risky} ta`, '#ffab00'],
@@ -1148,6 +1247,66 @@ function NetworkPage({ onAnalyze }) {
             </div>
           </div>
         )}
+      </Panel>
+
+      <Panel title="LOCAL SCAN GUIDE" color="#8b5cf6" style={{ marginTop: 14 }}>
+        <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
+            {localScanSteps.map(step => (
+              <div key={step.title} style={{
+                border: '1px solid rgba(139,92,246,.28)',
+                background: 'linear-gradient(180deg, rgba(24,18,44,.78), rgba(10,14,28,.94))',
+                padding: 14,
+                minHeight: 146,
+              }}>
+                <div style={{ color: '#c4b5fd', fontSize: 11, letterSpacing: 2, marginBottom: 8 }}>{step.title}</div>
+                <div style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.75, marginBottom: 12 }}>{step.text}</div>
+                <div style={{
+                  border: '1px solid rgba(139,92,246,.3)',
+                  background: 'rgba(139,92,246,.08)',
+                  color: '#d8b4fe',
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  fontFamily: 'Share Tech Mono',
+                }}>
+                  {step.bat}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{
+            border: '1px solid var(--border2)',
+            background: 'rgba(8,15,28,.72)',
+            padding: 14,
+          }}>
+            <div style={{ color: '#39ff14', fontSize: 11, letterSpacing: 2, marginBottom: 10 }}>BAT FAYLLAR</div>
+            {[
+              ['setup_project.bat', 'Birinchi o‘rnatish: venv, migrate, npm install'],
+              ['start_backend.bat', 'Django/ASGI backendni yoqadi'],
+              ['start_frontend.bat', 'Vite frontendni yoqadi'],
+              ['start_all.bat', 'Backend va frontendni birga yoqadi'],
+              ['enable_local_scan.bat', 'Protocol install + local agent start'],
+            ].map(([name, desc]) => (
+              <div key={name} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(159,194,234,.1)' }}>
+                <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#00e5ff', marginBottom: 4 }}>{name}</div>
+                <div style={{ color: '#7ab8d4', fontSize: 12, lineHeight: 1.65 }}>{desc}</div>
+              </div>
+            ))}
+            <div style={{
+              marginTop: 8,
+              padding: 10,
+              border: '1px solid rgba(57,255,20,.18)',
+              background: 'rgba(57,255,20,.05)',
+              color: '#b4ff9d',
+              fontSize: 12,
+              lineHeight: 1.7,
+            }}>
+              Kurs ishi uchun tavsiya oqim:
+              <br />
+              <span style={{ fontFamily: 'Share Tech Mono' }}>setup_project.bat</span> → <span style={{ fontFamily: 'Share Tech Mono' }}>start_all.bat</span> → <span style={{ fontFamily: 'Share Tech Mono' }}>enable_local_scan.bat</span>
+            </div>
+          </div>
+        </div>
       </Panel>
 
       {repInfo && (
@@ -2559,6 +2718,8 @@ function SIEMPage() {
 }
 
 function TopologyPage() {
+  const { events } = useLiveFeed();
+  const [trafficLogs, setTrafficLogs] = useState([]);
   const [scenarioKey, setScenarioKey] = useState('normal');
   const [guideKey, setGuideKey] = useState('star');
   const scenario = TOPOLOGY_SCENARIOS[scenarioKey];
@@ -2580,6 +2741,28 @@ function TopologyPage() {
     observer: { border:'rgba(138,124,245,.65)', bg:'rgba(138,124,245,.14)', color:'#e3dcff' },
   }[tone]);
   const packetCount = scenarioKey === 'attack' ? 8 : scenarioKey === 'blocked' ? 3 : 5;
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTrafficLogs = async () => {
+      try {
+        const response = await api.getTrafficLogs();
+        if (!active) return;
+        setTrafficLogs(response.results || response || []);
+      } catch {
+        if (!active) return;
+        setTrafficLogs([]);
+      }
+    };
+
+    loadTrafficLogs();
+    const id = setInterval(loadTrafficLogs, 6000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
 
   return (
     <div style={{ animation: 'fadeUp .3s ease', display: 'grid', gap: 14 }}>
@@ -2864,9 +3047,9 @@ function demoDevices() {
 
 // ── ROOT APP ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(() => !!localStorage.getItem('cg_auth'));
+  const [loggedIn, setLoggedIn] = useState(() => safeStorageGet('cg_auth', '') === '1');
   const [page, setPage]         = useState(() => {
-    const stored = localStorage.getItem('cg_page') || 'dashboard';
+    const stored = safeStorageGet('cg_page', 'dashboard');
     return stored === 'insights' ? 'threat_library' : stored;
   });
   const [analyzeIP, setAnalyzeIP] = useState('');
@@ -2893,8 +3076,8 @@ export default function App() {
     return () => clearInterval(id);
   }, [loggedIn]);
 
-  const navTo = p => { setPage(p); localStorage.setItem('cg_page', p); };
-  const handleLogin = () => { localStorage.setItem('cg_auth', '1'); setLoggedIn(true); };
+  const navTo = p => { setPage(p); safeStorageSet('cg_page', p); };
+  const handleLogin = () => { safeStorageSet('cg_auth', '1'); setLoggedIn(true); };
 
   const handleNetworkAnalyze = (ip, options = {}) => {
     setAnalyzeIP(ip);

@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+
+python manage.py migrate --noinput
+
+exec uvicorn cyberguard.asgi:application --host 0.0.0.0 --port 8000
