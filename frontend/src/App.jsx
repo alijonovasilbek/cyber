@@ -3240,33 +3240,40 @@ function estimateTopology(interfaces = [], devices = []) {
 
 function TopologyVisualPanel({ guideKey }) {
   const visual = TOPOLOGY_VISUALS[guideKey] || TOPOLOGY_VISUALS.star;
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const purple = themeAccent('purple', '#8a7cf5');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
   const nodeTone = tone => ({
     hostile: { border:'rgba(255,107,87,.55)', bg:'rgba(255,107,87,.12)', color:'#ffd5cf' },
     core: { border:'rgba(107,210,20,.55)', bg:'rgba(107,210,20,.12)', color:'#def8cf' },
-    service: { border:'rgba(159,194,234,.6)', bg:'rgba(159,194,234,.11)', color:'#d9e9fb' },
+    service: { border:panelBorder, bg:panelGlow, color:cyanSoft },
     internal: { border:'rgba(189,232,153,.5)', bg:'rgba(189,232,153,.12)', color:'#ebf8dc' },
-    observer: { border:'rgba(138,124,245,.65)', bg:'rgba(138,124,245,.14)', color:'#e3dcff' },
+    observer: { border:`${purple}88`, bg:`${purple}14`, color:cyanSoft },
   }[tone]);
   const visualNodeMap = Object.fromEntries(visual.nodes.map(node => [node.key, node]));
 
   return (
-    <div style={{ border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(17,34,58,.78), rgba(3,7,18,.98))', minHeight: 420, position: 'relative', overflow: 'hidden', perspective: 1200 }}>
-      <div style={{ position:'absolute', inset:18, border:'1px solid rgba(0,229,255,.08)', transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:'0 0 80px rgba(0,229,255,.04) inset' }}/>
-      <div style={{ position:'absolute', inset:'10% 8%', background:'linear-gradient(180deg, rgba(0,229,255,.03), transparent)', transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
+    <div style={{ border: '1px solid var(--border2)', background: `radial-gradient(circle at top, ${panelGlow}, rgba(3,7,18,.98))`, minHeight: 420, position: 'relative', overflow: 'hidden', perspective: 1200 }}>
+      <div style={{ position:'absolute', inset:18, border:`1px solid ${panelBorder}`, transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:`0 0 80px ${panelGlow} inset` }}/>
+      <div style={{ position:'absolute', inset:'10% 8%', background:`linear-gradient(180deg, ${panelGlow}, transparent)`, transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
       <svg viewBox="0 0 100 100" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
         {[...Array(9)].map((_, index) => (
-          <line key={`visual-grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(34,71,110,.18)" strokeWidth="0.15"/>
+          <line key={`visual-grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(57,255,20,.12)" strokeWidth="0.15"/>
         ))}
         {[...Array(5)].map((_, index) => (
-          <line key={`visual-grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(34,71,110,.14)" strokeWidth="0.15"/>
+          <line key={`visual-grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(57,255,20,.1)" strokeWidth="0.15"/>
         ))}
         {visual.edges.map(([fromKey, toKey], index) => {
           const from = visualNodeMap[fromKey];
           const to = visualNodeMap[toKey];
+          const edgeTone = index % 2 === 0 ? '#7df542' : purple;
           return (
             <g key={`${fromKey}-${toKey}`}>
-              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={index % 2 === 0 ? '#7df542' : '#8a7cf5'} strokeWidth="1.4" opacity="0.92"/>
-              <circle r="0.65" fill={index % 2 === 0 ? '#7df542' : '#8a7cf5'} style={{ filter:`drop-shadow(0 0 6px ${index % 2 === 0 ? '#7df542' : '#8a7cf5'})`, animation:`packetTravel ${2.2 + (index % 3) * .3}s linear ${index * .18}s infinite` }}>
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={edgeTone} strokeWidth="1.4" opacity="0.92"/>
+              <circle r="0.65" fill={edgeTone} style={{ filter:`drop-shadow(0 0 6px ${edgeTone})`, animation:`packetTravel ${2.2 + (index % 3) * .3}s linear ${index * .18}s infinite` }}>
                 <animateMotion dur={`${2.2 + (index % 3) * .3}s`} begin={`${index * .18}s`} repeatCount="indefinite" path={`M ${from.x} ${from.y} L ${to.x} ${to.y}`}/>
               </circle>
             </g>
@@ -3298,7 +3305,7 @@ function TopologyVisualPanel({ guideKey }) {
           </div>
         );
       })}
-      <div style={{ position:'absolute', left:18, right:18, bottom:14, padding:'10px 12px', border:'1px solid rgba(159,194,234,.15)', background:'rgba(3,7,18,.45)', color:'#a5c2d8', fontSize:12, lineHeight:1.7 }}>
+      <div style={{ position:'absolute', left:18, right:18, bottom:14, padding:'10px 12px', border:`1px solid ${panelBorder}`, background:'rgba(3,7,18,.45)', color:cyanDim, fontSize:12, lineHeight:1.7 }}>
         {visual.caption}
       </div>
     </div>
@@ -3315,21 +3322,27 @@ function TopologyPage() {
   const scenario = TOPOLOGY_SCENARIOS[scenarioKey];
   const guide = NETWORK_TYPE_GUIDES.find(item => item.key === guideKey) || NETWORK_TYPE_GUIDES[0];
   const estimatedTopology = estimateTopology(interfaces, devices);
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const purple = themeAccent('purple', '#8a7cf5');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
   const nodeMap = Object.fromEntries(TOPOLOGY_NODES.map(node => [node.key, node]));
   const stateStyle = state => ({
     ok: { color:'#6bd214', width:2.2 },
     warn: { color:'#e1c246', width:2.2 },
     attack: { color:'#ff6b57', width:2.6 },
-    blocked: { color:'#9fc2ea', width:2.6 },
-    monitor: { color:'#8a7cf5', width:1.8 },
-    idle: { color:'#627790', width:1.4 },
-  }[state] || { color:'#627790', width:1.4 });
+    blocked: { color:cyanSoft, width:2.6 },
+    monitor: { color:purple, width:1.8 },
+    idle: { color:cyanDim, width:1.4 },
+  }[state] || { color:cyanDim, width:1.4 });
   const nodeTone = tone => ({
     hostile: { border:'rgba(255,107,87,.55)', bg:'rgba(255,107,87,.12)', color:'#ffd5cf' },
     core: { border:'rgba(107,210,20,.55)', bg:'rgba(107,210,20,.12)', color:'#def8cf' },
-    service: { border:'rgba(159,194,234,.6)', bg:'rgba(159,194,234,.11)', color:'#d9e9fb' },
+    service: { border:panelBorder, bg:panelGlow, color:cyanSoft },
     internal: { border:'rgba(189,232,153,.5)', bg:'rgba(189,232,153,.12)', color:'#ebf8dc' },
-    observer: { border:'rgba(138,124,245,.65)', bg:'rgba(138,124,245,.14)', color:'#e3dcff' },
+    observer: { border:`${purple}88`, bg:`${purple}14`, color:cyanSoft },
   }[tone]);
   const packetCount = scenarioKey === 'attack' ? 8 : scenarioKey === 'blocked' ? 3 : 5;
 
@@ -3381,13 +3394,13 @@ function TopologyPage() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <Panel title="HOZIRGI ULANISHINGIZ TAXMINIY TOPOLOGIYASI" color={estimatedTopology.color}>
           <div className="panel-body" style={{ display:'grid', gap:12 }}>
-            <div style={{ padding:14, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+            <div style={{ padding:14, border:'1px solid var(--border2)', background:panelGlow }}>
               <div style={{ color: estimatedTopology.color, fontFamily:'Orbitron,monospace', fontSize:18, marginBottom:6 }}>{estimatedTopology.name}</div>
-              <div style={{ color:'#a5c2d8', fontSize:13, lineHeight:1.8 }}>{estimatedTopology.reason}</div>
+              <div style={{ color:cyanSoft, fontSize:13, lineHeight:1.8 }}>{estimatedTopology.reason}</div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10 }}>
               {[
-                ['Interfeyslar', interfaces.length || 0, '#00e5ff'],
+                ['Interfeyslar', interfaces.length || 0, cyan],
                 ['Topilgan qurilmalar', devices.length || 0, '#39ff14'],
                 ['Gatewayli interface', interfaces.filter(item => item.gateway).length || 0, '#ffab00'],
               ].map(([label, value, tone]) => (
@@ -3401,19 +3414,19 @@ function TopologyPage() {
               {interfaces.slice(0, 3).map(item => (
                 <div key={item.name} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
                   <div style={{ color:'#dce8f5', fontSize:12, marginBottom:4 }}>{displayText(item.name)}</div>
-                  <div style={{ color:'#7ab8d4', fontSize:11, fontFamily:'Share Tech Mono' }}>
+                  <div style={{ color:cyanDim, fontSize:11, fontFamily:'Share Tech Mono' }}>
                     {displayText(item.ip)} | GW {displayText(item.gateway)} | {displayText(item.ssid || item.adapter_type)}
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ color:'#7ab8d4', fontSize:12, lineHeight:1.7 }}>
+            <div style={{ color:cyanDim, fontSize:12, lineHeight:1.7 }}>
               Bu avtomatik taxmin. Real topologiya managed switch, VLAN, AP controller yoki router ortida murakkabroq bo&apos;lishi mumkin.
             </div>
           </div>
         </Panel>
 
-        <Panel title="TOPOLOGY VISUAL LAB" color="#8a7cf5">
+        <Panel title="TOPOLOGY VISUAL LAB" color={purple}>
           <div className="panel-body" style={{ display:'grid', gap:12 }}>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {NETWORK_TYPE_GUIDES.map(item => (
@@ -3429,20 +3442,20 @@ function TopologyPage() {
 
       <Panel title="LIVE SECURITY FLOW SCENE" color="#39ff14">
         <div className="panel-body">
-          <div style={{ marginBottom: 14, padding: 12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', color:'#a5c2d8', fontSize:13, lineHeight:1.75 }}>
+          <div style={{ marginBottom: 14, padding: 12, border:'1px solid var(--border2)', background:panelGlow, color:cyanSoft, fontSize:13, lineHeight:1.75 }}>
             Bu sahna aniq fizik topologiyani emas, balki tarmoq ichida threat oqimi qanday harakatlanishini ko&apos;rsatadi:
             <span style={{ fontFamily:'Share Tech Mono', color:'#dce8f5' }}> attacker to firewall/AI IDS to servislar to ichki segment</span>.
             Yuqoridagi <span style={{ fontFamily:'Share Tech Mono', color:'#dce8f5' }}>Topology Visual Lab</span> esa sof topologiya turlarini tushuntiradi.
           </div>
-          <div style={{ position: 'relative', minHeight: 430, border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(17,34,58,.78), rgba(3,7,18,.98))', overflow: 'hidden', perspective: 1200 }}>
-            <div style={{ position:'absolute', inset:18, border:'1px solid rgba(0,229,255,.08)', transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:'0 0 80px rgba(0,229,255,.04) inset' }}/>
-            <div style={{ position:'absolute', inset:'10% 8%', background:'linear-gradient(180deg, rgba(0,229,255,.03), transparent)', transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
+          <div style={{ position: 'relative', minHeight: 430, border: '1px solid var(--border2)', background: `radial-gradient(circle at top, ${panelGlow}, rgba(3,7,18,.98))`, overflow: 'hidden', perspective: 1200 }}>
+            <div style={{ position:'absolute', inset:18, border:`1px solid ${panelBorder}`, transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:`0 0 80px ${panelGlow} inset` }}/>
+            <div style={{ position:'absolute', inset:'10% 8%', background:`linear-gradient(180deg, ${panelGlow}, transparent)`, transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
             <svg viewBox="0 0 100 100" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
               {[...Array(9)].map((_, index) => (
-                <line key={`grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(34,71,110,.22)" strokeWidth="0.15"/>
+                <line key={`grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(57,255,20,.12)" strokeWidth="0.15"/>
               ))}
               {[...Array(5)].map((_, index) => (
-                <line key={`grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(34,71,110,.18)" strokeWidth="0.15"/>
+                <line key={`grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(57,255,20,.1)" strokeWidth="0.15"/>
               ))}
               {TOPOLOGY_EDGES.map(edge => {
                 const from = nodeMap[edge.from];
@@ -3505,12 +3518,12 @@ function TopologyPage() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
                   <div style={{ fontSize:18, color:'#dce8f5', fontWeight:700, marginBottom:6 }}>{guide.name}</div>
-                  <div style={{ fontSize:11, color:'#7ab8d4', fontFamily:'Share Tech Mono', marginBottom:10 }}>{guide.fit}</div>
-                  <div style={{ fontSize:13, color:'#a5c2d8', lineHeight:1.7 }}>{guide.summary}</div>
+                  <div style={{ fontSize:11, color:cyanDim, fontFamily:'Share Tech Mono', marginBottom:10 }}>{guide.fit}</div>
+                  <div style={{ fontSize:13, color:cyanSoft, lineHeight:1.7 }}>{guide.summary}</div>
                 </div>
                 <div style={{ display:'grid', gap:8 }}>
                   {guide.pros.map(point => (
-                    <div key={point} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(159,194,234,.08)', color:'#d5e5f6', fontSize:12 }}>
+                    <div key={point} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:panelGlow, color:cyanSoft, fontSize:12 }}>
                       {point}
                     </div>
                   ))}
@@ -3520,10 +3533,10 @@ function TopologyPage() {
 
             <div style={{ border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', padding:14 }}>
               <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>LIVE SCENE METRICS</div>
-              {[
-                ['Nodes', Object.keys(nodeMap).length, '#00e5ff'],
+              {[ 
+                ['Nodes', Object.keys(nodeMap).length, cyan],
                 ['Active links', Object.values(scenario.linkStates).filter(value => value !== 'idle').length, '#39ff14'],
-                ['Threat intensity', scenarioKey === 'attack' ? '92%' : scenarioKey === 'blocked' ? '26%' : '14%', scenarioKey === 'attack' ? '#ff1744' : scenarioKey === 'blocked' ? '#ffab00' : '#9fc2ea'],
+                ['Threat intensity', scenarioKey === 'attack' ? '92%' : scenarioKey === 'blocked' ? '26%' : '14%', scenarioKey === 'attack' ? '#ff1744' : scenarioKey === 'blocked' ? '#ffab00' : cyanSoft],
                 ['Selected topology', guide.name, '#dce8f5'],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:10, padding:'10px 0', borderBottom:'1px solid var(--border2)', fontSize:12 }}>
@@ -3540,13 +3553,13 @@ function TopologyPage() {
               </button>
             ))}
           </div>
-          <div style={{ marginTop: 12, padding: 14, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', color:'#a5c2d8', fontSize:13, lineHeight:1.8 }}>
+          <div style={{ marginTop: 12, padding: 14, border:'1px solid var(--border2)', background:panelGlow, color:cyanSoft, fontSize:13, lineHeight:1.8 }}>
             {scenario.summary}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:12, marginTop:12 }}>
               {[
                 ['Ingress', scenario.linkStates.ingress, stateStyle(scenario.linkStates.ingress).color],
-                ['Core services', `${['web','db','mail'].filter(key => scenario.linkStates[key] !== 'ok').length || 0} ta alert`, '#9fc2ea'],
-                ['AI telemetry', scenario.linkStates.telemetry, '#a78bfa'],
+                ['Core services', `${['web','db','mail'].filter(key => scenario.linkStates[key] !== 'ok').length || 0} ta alert`, cyanSoft],
+                ['AI telemetry', scenario.linkStates.telemetry, purple],
               ].map(([label, value, tone]) => (
                 <div key={label} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
                   <div style={{ color:'#4a6a84', fontSize:10, letterSpacing:2, marginBottom:5 }}>{label}</div>
@@ -3559,15 +3572,15 @@ function TopologyPage() {
       </Panel>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
-        <Panel title="EVENT BUS" color="#00e5ff">
+        <Panel title="EVENT BUS" color={cyan}>
           <div className="panel-body" style={{ maxHeight: 260, overflowY:'auto', display:'grid', gap:8 }}>
             {(events.length ? events : [{ kind:'system', timestamp:new Date().toISOString(), payload:{ message:'Realtime eventlar kutilmoqda' } }]).slice(0, 12).map((event, index) => (
-              <div key={`${event.kind}-${event.timestamp}-${index}`} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+              <div key={`${event.kind}-${event.timestamp}-${index}`} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:panelGlow }}>
                 <div style={{ display:'flex', justifyContent:'space-between', gap:8, marginBottom:6 }}>
-                  <span style={{ color:'#00e5ff', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(event.kind || 'event').toUpperCase()}</span>
+                  <span style={{ color:cyan, fontFamily:'Share Tech Mono', fontSize:11 }}>{String(event.kind || 'event').toUpperCase()}</span>
                   <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(event.timestamp)}</span>
                 </div>
-                <div style={{ color:'#94b4c8', fontSize:12, lineHeight:1.6 }}>
+                <div style={{ color:cyanSoft, fontSize:12, lineHeight:1.6 }}>
                   {displayText(event.payload?.attack_type || event.payload?.summary || event.payload?.message || event.payload?.ip || 'Event')}
                 </div>
               </div>
@@ -3583,8 +3596,8 @@ function TopologyPage() {
                   <span style={{ color:'#ffab00', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(item.traffic_type || '-').toUpperCase()}</span>
                   <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(item.created_at)}</span>
                 </div>
-                <div style={{ color:'#9fc2ea', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{displayText(item.ip_address)}:{displayText(item.port)}</div>
-                <div style={{ color:'#94b4c8', fontSize:12 }}>
+                <div style={{ color:cyanSoft, fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{displayText(item.ip_address)}:{displayText(item.port)}</div>
+                <div style={{ color:cyanSoft, fontSize:12 }}>
                   req={displayText(item.request_count)} | failed={displayText(item.failed_attempts)} | freq={displayText(item.connection_frequency)}
                 </div>
               </div>
