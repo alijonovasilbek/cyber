@@ -3312,9 +3312,9 @@ function TopologyPage() {
             <div style={{ display:'grid', gap:8 }}>
               {interfaces.slice(0, 3).map(item => (
                 <div key={item.name} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
-                  <div style={{ color:'#dce8f5', fontSize:12, marginBottom:4 }}>{item.name}</div>
+                  <div style={{ color:'#dce8f5', fontSize:12, marginBottom:4 }}>{displayText(item.name)}</div>
                   <div style={{ color:'#7ab8d4', fontSize:11, fontFamily:'Share Tech Mono' }}>
-                    {item.ip || '-'} | GW {item.gateway || '-'} | {item.ssid || item.adapter_type || '-'}
+                    {displayText(item.ip)} | GW {displayText(item.gateway)} | {displayText(item.ssid || item.adapter_type)}
                   </div>
                 </div>
               ))}
@@ -3440,7 +3440,7 @@ function TopologyPage() {
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:10, padding:'10px 0', borderBottom:'1px solid var(--border2)', fontSize:12 }}>
                   <span style={{ color:'#4a6a84' }}>{label}</span>
-                  <span style={{ color, fontFamily:'Share Tech Mono' }}>{value}</span>
+                  <span style={{ color, fontFamily:'Share Tech Mono' }}>{displayText(value)}</span>
                 </div>
               ))}
             </div>
@@ -3480,7 +3480,7 @@ function TopologyPage() {
                   <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(event.timestamp)}</span>
                 </div>
                 <div style={{ color:'#94b4c8', fontSize:12, lineHeight:1.6 }}>
-                  {event.payload?.attack_type || event.payload?.summary || event.payload?.message || event.payload?.ip || 'Event'}
+                  {displayText(event.payload?.attack_type || event.payload?.summary || event.payload?.message || event.payload?.ip || 'Event')}
                 </div>
               </div>
             ))}
@@ -3495,9 +3495,9 @@ function TopologyPage() {
                   <span style={{ color:'#ffab00', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(item.traffic_type || '-').toUpperCase()}</span>
                   <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(item.created_at)}</span>
                 </div>
-                <div style={{ color:'#9fc2ea', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{item.ip_address}:{item.port}</div>
+                <div style={{ color:'#9fc2ea', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{displayText(item.ip_address)}:{displayText(item.port)}</div>
                 <div style={{ color:'#94b4c8', fontSize:12 }}>
-                  req={item.request_count} | failed={item.failed_attempts} | freq={item.connection_frequency}
+                  req={displayText(item.request_count)} | failed={displayText(item.failed_attempts)} | freq={displayText(item.connection_frequency)}
                 </div>
               </div>
             ))}
