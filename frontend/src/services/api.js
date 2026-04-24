@@ -13,6 +13,56 @@ const WS_BASE = API_HOST
 const LOCAL_AGENT_BASE = 'http://127.0.0.1:8765';
 let localAgentCache = { value: false, expiresAt: 0 };
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeInterfaces(payload) {
+  const interfaces = asArray(payload?.interfaces).map(item => ({
+    ...item,
+    ip: item?.ip || item?.ipv4 || '',
+    adapter_type: item?.adapter_type || 'Local Agent',
+    state: item?.state || 'up',
+    subnet_mask: item?.subnet_mask || '',
+    dns_suffix: item?.dns_suffix || '',
+    link_local_ipv6: item?.link_local_ipv6 || '',
+    ipv6_addresses: asArray(item?.ipv6_addresses),
+    temporary_ipv6_addresses: asArray(item?.temporary_ipv6_addresses),
+    gateways: asArray(item?.gateways).length ? item.gateways : (item?.gateway ? [item.gateway] : []),
+  }));
+  return { ...payload, interfaces };
+}
+
+function normalizeWifiStatus(payload) {
+  if (!payload) return payload;
+  if ('wifi_adapter_available' in payload || 'service_running' in payload) {
+    return {
+      ...payload,
+      available_networks: asArray(payload.available_networks),
+    };
+  }
+  return {
+    ...payload,
+    wifi_adapter_available: Boolean(payload.connected || payload.interface_name || payload.ipv4),
+    service_running: true,
+    connected_ssid: payload.ssid || '',
+    connected_interface: payload.interface_name || '',
+    available_networks: asArray(payload.available_networks),
+    message: payload.message || 'Portable local agent faqat lokal interfeys va hostlarni ko‘rsatadi.',
+  };
+}
+
+function normalizeNetworkScan(payload) {
+  const devices = asArray(payload?.devices).map(device => ({
+    ...device,
+    open_ports: asArray(device?.open_ports),
+    name: device?.name || 'Detected Host',
+    risk: device?.risk || 'low',
+    status: device?.status || 'online',
+  }));
+  return { ...payload, devices };
+}
+
 function getApiKey() {
   try {
     return localStorage.getItem('cg_api_key') || 'cyberguard-demo-key';
@@ -107,14 +157,14 @@ async function localAgentRequest(path, options = {}) {
 
 async function getInterfaces() {
   if (await hasLocalAgent()) {
-    return localAgentRequest('/network/interfaces');
+    return normalizeInterfaces(await localAgentRequest('/network/interfaces'));
   }
   return get('/network/interfaces/');
 }
 
 async function getWifiStatus() {
   if (await hasLocalAgent()) {
-    return localAgentRequest('/network/wifi/status');
+    return normalizeWifiStatus(await localAgentRequest('/network/wifi/status'));
   }
   return get('/network/wifi/status/');
 }
@@ -132,7 +182,7 @@ async function connectWifi(data) {
 
 async function scanNetwork() {
   if (await hasLocalAgent()) {
-    return localAgentRequest('/network/scan');
+    return normalizeNetworkScan(await localAgentRequest('/network/scan'));
   }
   return get('/network/scan/');
 }

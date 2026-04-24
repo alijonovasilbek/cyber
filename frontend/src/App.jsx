@@ -18,6 +18,26 @@ function safeStorageSet(key, value) {
   }
 }
 
+function displayText(value, fallback = '-') {
+  if (value == null || value === '') return fallback;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => displayText(item, '')).filter(Boolean).join(', ') || fallback;
+  }
+  if (typeof value === 'object') {
+    const preferred = value.message || value.name || value.label || value.title || value.ip || value.value;
+    if (preferred) return String(preferred);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const THREATS_LIST = [
   {v:'ddos',l:'DDoS hujumi'},{v:'sqli',l:'SQL Injection'},{v:'brute_force',l:'Brute Force'},
@@ -1664,7 +1684,7 @@ function NetworkPage({ onAnalyze }) {
                   <div><span style={{ color: '#4a6a84' }}>Connected SSID: </span>{wifiStatus.connected_ssid || '-'}</div>
                   <div><span style={{ color: '#4a6a84' }}>Interface: </span>{wifiStatus.connected_interface || '-'}</div>
                 </div>
-                <div style={{ color: '#94b4c8', fontSize: 12, marginBottom: 12 }}>{wifiStatus.message}</div>
+                <div style={{ color: '#94b4c8', fontSize: 12, marginBottom: 12 }}>{displayText(wifiStatus.message)}</div>
 
                 {!wifiStatus.wifi_adapter_available && (
                   <div style={{ color: '#ffab00', fontSize: 12 }}>
@@ -1758,20 +1778,20 @@ function NetworkPage({ onAnalyze }) {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                       <div>
-                        <div style={{ color: 'var(--text)', fontWeight: 700 }}>{item.name}</div>
-                        <div style={{ fontSize: 11, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>{item.adapter_type}</div>
+                        <div style={{ color: 'var(--text)', fontWeight: 700 }}>{displayText(item.name)}</div>
+                        <div style={{ fontSize: 11, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>{displayText(item.adapter_type)}</div>
                       </div>
                       <div style={{ textAlign: 'right', fontFamily: 'Share Tech Mono', fontSize: 11, color: '#7ab8d4' }}>
-                        {item.ssid || item.subnet_cidr || '-'}
+                        {displayText(item.ssid || item.subnet_cidr)}
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10, fontSize: 12 }}>
-                      <div><span style={{ color: '#4a6a84' }}>IP: </span>{item.ip || '-'}</div>
-                      <div><span style={{ color: '#4a6a84' }}>Gateway: </span>{item.gateway || '-'}</div>
-                      <div><span style={{ color: '#4a6a84' }}>Mask: </span>{item.subnet_mask || '-'}</div>
-                      <div><span style={{ color: '#4a6a84' }}>State: </span>{item.state || '-'}</div>
-                      <div><span style={{ color: '#4a6a84' }}>DNS Suffix: </span>{item.dns_suffix || '-'}</div>
-                      <div><span style={{ color: '#4a6a84' }}>Link-local IPv6: </span>{item.link_local_ipv6 || '-'}</div>
+                      <div><span style={{ color: '#4a6a84' }}>IP: </span>{displayText(item.ip)}</div>
+                      <div><span style={{ color: '#4a6a84' }}>Gateway: </span>{displayText(item.gateway)}</div>
+                      <div><span style={{ color: '#4a6a84' }}>Mask: </span>{displayText(item.subnet_mask)}</div>
+                      <div><span style={{ color: '#4a6a84' }}>State: </span>{displayText(item.state)}</div>
+                      <div><span style={{ color: '#4a6a84' }}>DNS Suffix: </span>{displayText(item.dns_suffix)}</div>
+                      <div><span style={{ color: '#4a6a84' }}>Link-local IPv6: </span>{displayText(item.link_local_ipv6)}</div>
                     </div>
                     {item.ipv6_addresses?.length > 0 && (
                       <div style={{ marginTop: 8, fontSize: 12 }}>
@@ -1849,10 +1869,10 @@ function NetworkPage({ onAnalyze }) {
                   </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 10, fontSize: 12 }}>
-                  <div><span style={{ color: '#4a6a84' }}>User: </span>{profile.username || '-'}</div>
-                  <div><span style={{ color: '#4a6a84' }}>Secret: </span>{profile.has_secret ? 'saved' : 'missing'}</div>
-                  <div><span style={{ color: '#4a6a84' }}>Label: </span>{profile.network_label || '-'}</div>
-                  <div><span style={{ color: '#4a6a84' }}>Last used: </span>{profile.last_used_at ? fmtTime(profile.last_used_at) : '-'}</div>
+                    <div><span style={{ color: '#4a6a84' }}>User: </span>{displayText(profile.username)}</div>
+                    <div><span style={{ color: '#4a6a84' }}>Secret: </span>{profile.has_secret ? 'saved' : 'missing'}</div>
+                    <div><span style={{ color: '#4a6a84' }}>Label: </span>{displayText(profile.network_label)}</div>
+                    <div><span style={{ color: '#4a6a84' }}>Last used: </span>{profile.last_used_at ? fmtTime(profile.last_used_at) : '-'}</div>
                 </div>
               </div>
             ))}
@@ -1866,13 +1886,13 @@ function NetworkPage({ onAnalyze }) {
               <div key={session.id} style={{ padding: 12, border: '1px solid var(--border2)', background: 'var(--panel2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                   <div>
-                    <div style={{ color: 'var(--text)', fontWeight: 700 }}>{session.profile_name}</div>
+                    <div style={{ color: 'var(--text)', fontWeight: 700 }}>{displayText(session.profile_name)}</div>
                     <div style={{ color: '#4a6a84', fontSize: 11, fontFamily: 'Share Tech Mono' }}>
-                      {session.profile_type?.toUpperCase()} | {session.target_host} | {session.status?.toUpperCase()}
+                      {displayText(session.profile_type)?.toUpperCase()} | {displayText(session.target_host)} | {displayText(session.status)?.toUpperCase()}
                     </div>
                   </div>
                   <div style={{ color: session.status === 'success' ? '#39ff14' : session.status === 'failed' ? '#ff1744' : '#ffab00', fontFamily: 'Share Tech Mono', fontSize: 11 }}>
-                    {session.network_name || session.interface_name || '-'}
+                    {displayText(session.network_name || session.interface_name)}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -1882,17 +1902,17 @@ function NetworkPage({ onAnalyze }) {
                 </div>
                 <div style={{ fontSize: 12, color: '#94b4c8', marginTop: 8 }}>
                   {session.status === 'failed'
-                    ? (session.error_message || session.summary || 'Natija kutilmoqda')
-                    : (session.summary || session.error_message || 'Natija kutilmoqda')}
+                    ? displayText(session.error_message || session.summary || 'Natija kutilmoqda')
+                    : displayText(session.summary || session.error_message || 'Natija kutilmoqda')}
                 </div>
                 {session.result?.hostname && (
                   <div style={{ marginTop: 8, fontSize: 12 }}>
-                    <span style={{ color: '#4a6a84' }}>Hostname: </span>{session.result.hostname}
+                    <span style={{ color: '#4a6a84' }}>Hostname: </span>{displayText(session.result.hostname)}
                   </div>
                 )}
                 {session.result?.prompt && (
                   <div style={{ marginTop: 6, fontSize: 12 }}>
-                    <span style={{ color: '#4a6a84' }}>Prompt: </span>{session.result.prompt}
+                    <span style={{ color: '#4a6a84' }}>Prompt: </span>{displayText(session.result.prompt)}
                   </div>
                 )}
                 {session.result?.device_description && (
@@ -1909,7 +1929,7 @@ function NetworkPage({ onAnalyze }) {
                     maxHeight: 180,
                     overflowY: 'auto',
                   }}>
-                    {session.result.device_description}
+                    {displayText(session.result.device_description)}
                   </div>
                 )}
                 {session.result?.open_ports_detected?.length > 0 && (
