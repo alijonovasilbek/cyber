@@ -2004,6 +2004,12 @@ function NetworkPage({ onAnalyze }) {
 }
 
 function GlobalThreatMapPanel({ compact = false }) {
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const amberTone = themeAccent('amber', '#ffab00');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
   const origins = [
     { x: 12, y: 20, region: 'North America', type: 'Botnet C2', severity: 82 },
     { x: 18, y: 58, region: 'South America', type: 'Phishing relay', severity: 61 },
@@ -2020,16 +2026,16 @@ function GlobalThreatMapPanel({ compact = false }) {
   const avgSeverity = Math.round(origins.reduce((sum, item) => sum + item.severity, 0) / origins.length);
 
   return (
-    <div style={{ border: '1px solid var(--border2)', background: 'linear-gradient(180deg, rgba(7,18,35,.96), rgba(4,11,24,.98))' }}>
+    <div style={{ border: '1px solid var(--border2)', background: `linear-gradient(180deg, ${panelGlow}, rgba(4,11,24,.98))` }}>
       <svg viewBox="0 0 100 60" style={{ display: 'block', width: '100%', height }}>
-        {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(x => <line key={`vx-${x}`} x1={x} y1="0" x2={x} y2="60" stroke="rgba(43,77,118,.22)" strokeWidth="0.25"/>)}
-        {[10, 20, 30, 40, 50].map(y => <line key={`hy-${y}`} x1="0" y1={y} x2="100" y2={y} stroke="rgba(43,77,118,.22)" strokeWidth="0.25"/>)}
-        <path d="M6 9 L18 6 L21 12 L18 22 L12 27 L7 21 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
-        <path d="M15 27 L26 25 L30 30 L28 44 L18 47 L12 40 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
-        <path d="M38 6 L49 5 L49 14 L37 15 L35 10 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
-        <path d="M36 16 L50 15 L52 20 L49 38 L42 41 L36 34 L34 22 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
-        <path d="M49 5 L81 5 L83 12 L76 22 L64 26 L50 20 L49 14 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
-        <path d="M64 29 L81 28 L83 40 L74 44 L64 41 Z" fill="rgba(25,48,81,.75)" stroke="rgba(75,114,162,.4)" strokeWidth="0.3"/>
+        {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(x => <line key={`vx-${x}`} x1={x} y1="0" x2={x} y2="60" stroke="rgba(57,255,20,.12)" strokeWidth="0.25"/>)}
+        {[10, 20, 30, 40, 50].map(y => <line key={`hy-${y}`} x1="0" y1={y} x2="100" y2={y} stroke="rgba(57,255,20,.12)" strokeWidth="0.25"/>)}
+        <path d="M6 9 L18 6 L21 12 L18 22 L12 27 L7 21 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
+        <path d="M15 27 L26 25 L30 30 L28 44 L18 47 L12 40 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
+        <path d="M38 6 L49 5 L49 14 L37 15 L35 10 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
+        <path d="M36 16 L50 15 L52 20 L49 38 L42 41 L36 34 L34 22 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
+        <path d="M49 5 L81 5 L83 12 L76 22 L64 26 L50 20 L49 14 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
+        <path d="M64 29 L81 28 L83 40 L74 44 L64 41 Z" fill="rgba(12,26,12,.82)" stroke="rgba(57,255,20,.2)" strokeWidth="0.3"/>
         {origins.map((origin, index) => (
           <g key={index}>
             <line x1={origin.x} y1={origin.y} x2={protectedNode.x} y2={protectedNode.y} stroke={index % 2 ? 'rgba(255,59,92,.7)' : 'rgba(255,88,122,.55)'} strokeWidth="0.35"/>
@@ -2046,29 +2052,29 @@ function GlobalThreatMapPanel({ compact = false }) {
           <div style={{ padding: 12, border: '1px solid rgba(255,23,68,.18)', background: 'rgba(255,23,68,.06)' }}>
             <div style={{ color: '#ff8fa0', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>THREAT SUMMARY</div>
             <div style={{ color: 'var(--text)', fontSize: 18, fontFamily: 'Orbitron,monospace', marginBottom: 4 }}>{origins.length} ACTIVE ORIGINS</div>
-            <div style={{ color: '#9fc2ea', fontSize: 12, lineHeight: 1.6 }}>
-              O&apos;rtacha xavf darajasi <span style={{ color: '#ffab00', fontFamily: 'Share Tech Mono' }}>{avgSeverity}%</span>.
+            <div style={{ color: cyanSoft, fontSize: 12, lineHeight: 1.6 }}>
+              O&apos;rtacha xavf darajasi <span style={{ color: amberTone, fontFamily: 'Share Tech Mono' }}>{avgSeverity}%</span>.
               Karta qaysi regionlardan traffic kelayotganini va protected node&apos;ga oqimini ko&apos;rsatadi.
             </div>
           </div>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>TOP SOURCES</div>
             {topOrigins.map(item => (
-              <div key={`${item.region}-${item.type}`} style={{ padding: '8px 0', borderBottom: '1px solid rgba(159,194,234,.1)' }}>
+              <div key={`${item.region}-${item.type}`} style={{ padding: '8px 0', borderBottom: `1px solid ${panelBorder}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                   <span style={{ color: 'var(--text)', fontSize: 12 }}>{item.region}</span>
                   <span style={{ color: '#ff4668', fontFamily: 'Share Tech Mono', fontSize: 11 }}>{item.severity}%</span>
                 </div>
-                <div style={{ color: '#8eb6db', fontSize: 12 }}>{item.type}</div>
+                <div style={{ color: cyanDim, fontSize: 12 }}>{item.type}</div>
               </div>
             ))}
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 16, padding: '0 12px 12px', fontSize: 10, color: '#7ea8ca', fontFamily: 'Share Tech Mono', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, padding: '0 12px 12px', fontSize: 10, color: cyanDim, fontFamily: 'Share Tech Mono', flexWrap: 'wrap' }}>
         <span style={{ color: '#ff4668' }}>● ATTACK ORIGIN</span>
         <span style={{ color: '#39ff14' }}>● PROTECTED NODE</span>
-        <span style={{ color: '#6ea8ff' }}>— THREAT VECTOR</span>
+        <span style={{ color: cyan }}>— THREAT VECTOR</span>
       </div>
     </div>
   );
@@ -2080,11 +2086,14 @@ function ThreatFlowPanel({ threat, color }) {
   const detect = item.detect || [];
   const usecases = item.usecases || [];
   const metrics = item.metrics || {};
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 12 }}>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>ATTACK FLOW</div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(stages.length, 1)}, minmax(0, 1fr))`, gap: 8 }}>
             {stages.map((stage, index) => (
@@ -2095,16 +2104,16 @@ function ThreatFlowPanel({ threat, color }) {
             ))}
           </div>
         </div>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>IMPACT SCORE</div>
           {[
-            ['Aniqlash', metrics.detect || 0, '#00e5ff'],
+            ['Aniqlash', metrics.detect || 0, cyan],
             ['Containment', metrics.contain || 0, '#ffab00'],
             ['Biznes zarar', metrics.business || 0, color],
           ].map(([label, value, tone]) => (
             <div key={label} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                <span style={{ color: '#94b4c8' }}>{label}</span>
+                <span style={{ color: cyanSoft }}>{label}</span>
                 <span style={{ color: tone, fontFamily: 'Share Tech Mono' }}>{value}%</span>
               </div>
               <div style={{ height: 5, background: 'var(--border2)' }}>
@@ -2116,20 +2125,20 @@ function ThreatFlowPanel({ threat, color }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>DETECTION CUES</div>
           {detect.map(point => (
-            <div key={point} style={{ color: '#9fc2ea', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
+            <div key={point} style={{ color: cyanSoft, fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
           ))}
         </div>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>BUSINESS IMPACT</div>
           <div style={{ color: '#dce8f5', fontSize: 13, lineHeight: 1.7 }}>{item.impact}</div>
         </div>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>TYPICAL TARGETS</div>
           {usecases.map(point => (
-            <div key={point} style={{ color: '#94b4c8', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
+            <div key={point} style={{ color: cyanSoft, fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{point}</div>
           ))}
         </div>
       </div>
@@ -2138,54 +2147,59 @@ function ThreatFlowPanel({ threat, color }) {
 }
 
 function DatasetIntelCard({ dataset }) {
+  const amberTone = themeAccent('amber', '#ffab00');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+
   return (
-    <Panel key={dataset.name} title={dataset.name} color="#ffab00">
+    <Panel key={dataset.name} title={dataset.name} color={amberTone}>
       <div className="panel-body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'start', marginBottom: 12 }}>
           <div>
-            <div style={{ color: '#7ab8d4', fontSize: 11, fontFamily: 'Share Tech Mono', marginBottom: 6 }}>{dataset.source}</div>
-            <div style={{ color: '#94b4c8', fontSize: 13, lineHeight: 1.7 }}>{dataset.desc}</div>
+            <div style={{ color: cyanDim, fontSize: 11, fontFamily: 'Share Tech Mono', marginBottom: 6 }}>{dataset.source}</div>
+            <div style={{ color: cyanSoft, fontSize: 13, lineHeight: 1.7 }}>{dataset.desc}</div>
           </div>
-          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00', padding: '2px 10px', border: '1px solid rgba(255,171,0,.4)', background: 'rgba(255,171,0,.08)' }}>
+          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: amberTone, padding: '2px 10px', border: `1px solid ${amberTone}66`, background: `${amberTone}14` }}>
             {dataset.records} yozuv
           </span>
         </div>
 
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-            <span style={{ color: '#94b4c8' }}>Demo ichidagi foydalilik</span>
-            <span style={{ color: '#ffab00', fontFamily: 'Share Tech Mono' }}>{dataset.pct}%</span>
+            <span style={{ color: cyanSoft }}>Demo ichidagi foydalilik</span>
+            <span style={{ color: amberTone, fontFamily: 'Share Tech Mono' }}>{dataset.pct}%</span>
           </div>
           <div style={{ height: 4, background: 'var(--border2)' }}>
-            <div style={{ width: `${dataset.pct}%`, height: '100%', background: 'linear-gradient(90deg,#ffab00,#ff1744)', boxShadow: '0 0 6px rgba(255,171,0,.4)' }}/>
+            <div style={{ width: `${dataset.pct}%`, height: '100%', background: `linear-gradient(90deg,${amberTone},#39ff14)`, boxShadow: `0 0 6px ${amberTone}66` }}/>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>QACHON ISHLATILADI</div>
             <div style={{ color: '#dce8f5', fontSize: 12, lineHeight: 1.7 }}>{dataset.fit}</div>
           </div>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>NAMUNA YOZUV</div>
-            <div style={{ color: '#9fc2ea', fontSize: 11, lineHeight: 1.7, fontFamily: 'Share Tech Mono' }}>{dataset.sample}</div>
+            <div style={{ color: cyanSoft, fontSize: 11, lineHeight: 1.7, fontFamily: 'Share Tech Mono' }}>{dataset.sample}</div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>HUJUM TURLARI</div>
             {dataset.attacks.map(item => (
               <div key={item} style={{ color: '#dce8f5', fontSize: 12, marginBottom: 6 }}>{item}</div>
             ))}
           </div>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>MUHIM FEATURELAR</div>
             {dataset.features.map(item => (
-              <div key={item} style={{ color: '#9fc2ea', fontSize: 12, marginBottom: 6, fontFamily: 'Share Tech Mono' }}>{item}</div>
+              <div key={item} style={{ color: cyanSoft, fontSize: 12, marginBottom: 6, fontFamily: 'Share Tech Mono' }}>{item}</div>
             ))}
           </div>
-          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>MOS MODELLAR</div>
             {dataset.models.map(item => (
               <div key={item} style={{ color: '#b4ff9d', fontSize: 12, marginBottom: 6 }}>{item}</div>
@@ -2203,8 +2217,12 @@ function DatasetIntelCard({ dataset }) {
 
 function SIEMArchitecturePanel({ tool }) {
   const detail = SIEM_DETAIL_MAP[tool?.key] || { sources: [], pipeline: [], strengths: [], fit: [], ops: {} };
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
   const snapshotRows = [
-    ['Ingest', detail.ops.deploy || 0, 'rgba(159,194,234,.14)', '#9fc2ea'],
+    ['Ingest', detail.ops.deploy || 0, `${cyan}22`, cyanSoft],
     ['Parse', detail.ops.tuning || 0, 'rgba(57,255,20,.12)', '#39ff14'],
     ['Detect', Math.round(((detail.ops.deploy || 0) + (detail.ops.learning || 0)) / 2), 'rgba(255,171,0,.12)', '#ffab00'],
     ['Respond', detail.ops.learning || 0, 'rgba(255,23,68,.1)', '#ff6b7f'],
@@ -2212,25 +2230,25 @@ function SIEMArchitecturePanel({ tool }) {
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.15fr .85fr', gap: 12 }}>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>DATA FLOW</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
             {detail.pipeline.map((step, index) => (
-              <div key={step} style={{ padding: 10, border: '1px solid rgba(0,229,255,.18)', background: 'rgba(0,229,255,.06)', minHeight: 72 }}>
-                <div style={{ color: '#00e5ff', fontFamily: 'Share Tech Mono', fontSize: 10, marginBottom: 6 }}>{String(index + 1).padStart(2, '0')}</div>
+              <div key={step} style={{ padding: 10, border: `1px solid ${panelBorder}`, background: panelGlow, minHeight: 72 }}>
+                <div style={{ color: cyan, fontFamily: 'Share Tech Mono', fontSize: 10, marginBottom: 6 }}>{String(index + 1).padStart(2, '0')}</div>
                 <div style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.4 }}>{step}</div>
               </div>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginTop: 12 }}>
             {detail.sources.map(source => (
-              <div key={source} style={{ padding: '8px 10px', border: '1px solid var(--border2)', background: 'rgba(159,194,234,.08)', color: '#cfe0f5', fontSize: 12 }}>
+              <div key={source} style={{ padding: '8px 10px', border: '1px solid var(--border2)', background: panelGlow, color: '#cfe0f5', fontSize: 12 }}>
                 {source}
               </div>
             ))}
           </div>
         </div>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>OPERATIONS</div>
           {[
             ['Deploy', detail.ops.deploy || 0, '#39ff14'],
@@ -2239,7 +2257,7 @@ function SIEMArchitecturePanel({ tool }) {
           ].map(([label, value, tone]) => (
             <div key={label} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                <span style={{ color: '#94b4c8' }}>{label}</span>
+                <span style={{ color: cyanSoft }}>{label}</span>
                 <span style={{ color: tone, fontFamily: 'Share Tech Mono' }}>{value}%</span>
               </div>
               <div style={{ height: 5, background: 'var(--border2)' }}>
@@ -2257,26 +2275,26 @@ function SIEMArchitecturePanel({ tool }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>STRONG SIDES</div>
           {detail.strengths.map(item => (
-            <div key={item} style={{ color: '#94b4c8', fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{item}</div>
+            <div key={item} style={{ color: cyanSoft, fontSize: 12, lineHeight: 1.6, marginBottom: 6 }}>{item}</div>
           ))}
         </div>
-        <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
+        <div style={{ border: '1px solid var(--border2)', background: panelGlow, padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>VISUAL SNAPSHOT</div>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 10, alignItems: 'stretch' }}>
             <div style={{
-              border: '1px solid rgba(0,229,255,.18)',
-              background: 'linear-gradient(180deg, rgba(0,229,255,.14), rgba(159,194,234,.06))',
+              border: `1px solid ${panelBorder}`,
+              background: `linear-gradient(180deg, ${cyan}22, ${panelGlow})`,
               padding: 10,
               display: 'grid',
               alignContent: 'center',
               justifyItems: 'center',
               minHeight: 142,
             }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(0,229,255,.35)', background: 'rgba(0,229,255,.1)', boxShadow: '0 0 18px rgba(0,229,255,.14)' }}/>
-              <div style={{ marginTop: 10, color: '#00e5ff', fontSize: 10, fontFamily: 'Share Tech Mono', textAlign: 'center', lineHeight: 1.5 }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', border: `1px solid ${panelBorder}`, background: `${cyan}18`, boxShadow: `0 0 18px ${cyan}22` }}/>
+              <div style={{ marginTop: 10, color: cyan, fontSize: 10, fontFamily: 'Share Tech Mono', textAlign: 'center', lineHeight: 1.5 }}>
                 CORE
                 <br />
                 ENGINE
@@ -2289,14 +2307,14 @@ function SIEMArchitecturePanel({ tool }) {
                     <span style={{ color: '#dce8f5', fontSize: 12 }}>{label}</span>
                     <span style={{ color: tone, fontFamily: 'Share Tech Mono', fontSize: 11 }}>{value}%</span>
                   </div>
-                  <div style={{ height: 5, background: 'rgba(159,194,234,.14)' }}>
+                  <div style={{ height: 5, background: `${cyan}22` }}>
                     <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${tone}, rgba(255,255,255,.85))` }}/>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          <div style={{ marginTop: 10, color: '#7ab8d4', fontSize: 12, lineHeight: 1.7 }}>
+          <div style={{ marginTop: 10, color: cyanSoft, fontSize: 12, lineHeight: 1.7 }}>
             Mini snapshot tanlangan SIEM stack&apos;ning ingest, parse, detect va respond bosqichlaridagi nisbiy tayyorlik darajasini ko&apos;rsatadi.
           </div>
         </div>
@@ -2825,9 +2843,17 @@ function InsightsPage({ initialTab = 'threats' }) {
   const [selAlgo,   setSelAlgo]   = useState(ALGO_LIBRARY[0]);
   const [selSiem,   setSelSiem]   = useState(SIEM_TOOLS[0]);
   const [tab, setTab] = useState(initialTab);
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const purple = themeAccent('purple', '#a855f7');
+  const amberTone = themeAccent('amber', '#ffab00');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelGlowStrong = themeAccent('panelGlowStrong', 'rgba(0,229,255,.08)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
 
   const sevColor = sev => ({ critical:'#ff1744', high:'#fb923c', medium:'#ffab00', low:'#39ff14' }[sev] || '#39ff14');
-  const algoColor = t => ({ Supervised:'#00e5ff', Unsupervised:'#ffab00', 'Deep Learning':'#a855f7' }[t] || '#00e5ff');
+  const algoColor = t => ({ Supervised:cyan, Unsupervised:amberTone, 'Deep Learning':purple }[t] || cyan);
 
   useEffect(() => {
     setTab(initialTab);
@@ -2880,10 +2906,10 @@ function InsightsPage({ initialTab = 'threats' }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
                 {[
                   ['Severity', selThreat?.sev?.toUpperCase(), sevColor(selThreat?.sev)],
-                  ['Detectability', `${selThreat?.metrics?.detect || 0}%`, '#00e5ff'],
-                  ['Business Impact', `${selThreat?.metrics?.business || 0}%`, '#ffab00'],
+                  ['Detectability', `${selThreat?.metrics?.detect || 0}%`, cyan],
+                  ['Business Impact', `${selThreat?.metrics?.business || 0}%`, amberTone],
                 ].map(([label, value, tone]) => (
-                  <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+                  <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
                     <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>{label}</div>
                     <div style={{ color: tone, fontFamily: 'Orbitron,monospace', fontSize: 18 }}>{value}</div>
                   </div>
@@ -2891,13 +2917,13 @@ function InsightsPage({ initialTab = 'threats' }) {
               </div>
               <div style={{ marginBottom: 16 }}>
                 <div className="panel-title" style={{ marginBottom: 8 }}>ALOMATLAR</div>
-                <p style={{ fontSize: 13, color: '#94b4c8', lineHeight: 1.7 }}>{selThreat?.signs}</p>
+                <p style={{ fontSize: 13, color: cyanSoft, lineHeight: 1.7 }}>{selThreat?.signs}</p>
               </div>
               <div style={{ marginBottom: 16 }}>
                 <div className="panel-title" style={{ marginBottom: 8 }}>AI YONDASHUVI</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {selThreat?.algo?.split(', ').map(a => (
-                    <span key={a} style={{ padding: '4px 12px', border: '1px solid rgba(0,229,255,.3)', color: 'var(--cyan)', fontFamily: 'Share Tech Mono', fontSize: 11, background: 'rgba(0,229,255,.05)' }}>{a}</span>
+                    <span key={a} style={{ padding: '4px 12px', border: `1px solid ${panelBorder}`, color: cyan, fontFamily: 'Share Tech Mono', fontSize: 11, background: panelGlow }}>{a}</span>
                   ))}
                 </div>
               </div>
@@ -2909,7 +2935,7 @@ function InsightsPage({ initialTab = 'threats' }) {
 
       {tab === 'algorithms' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14 }}>
-          <Panel title="ML ALGORITMLAR" color="#a855f7">
+          <Panel title="ML ALGORITMLAR" color={purple}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: 14 }}>
               {ALGO_LIBRARY.map(a => (
                 <div key={a.key} onClick={() => setSelAlgo(a)} style={{
@@ -2934,15 +2960,15 @@ function InsightsPage({ initialTab = 'threats' }) {
             <div className="panel-body">
               <div style={{ fontFamily: 'Orbitron,monospace', fontSize: 16, fontWeight: 700, color: algoColor(selAlgo?.type), marginBottom: 4 }}>{selAlgo?.name}</div>
               <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: 'var(--text-dim)', marginBottom: 14 }}>{selAlgo?.type} · {selAlgo?.sub}</div>
-              <p style={{ fontSize: 13, color: '#94b4c8', lineHeight: 1.7, marginBottom: 16 }}>{selAlgo?.desc}</p>
+              <p style={{ fontSize: 13, color: cyanSoft, lineHeight: 1.7, marginBottom: 16 }}>{selAlgo?.desc}</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
                 {[
                   ['Speed', ALGO_VISUAL_METRICS[selAlgo?.key]?.speed, '#39ff14'],
-                  ['Explain', ALGO_VISUAL_METRICS[selAlgo?.key]?.explain, '#ffab00'],
+                  ['Explain', ALGO_VISUAL_METRICS[selAlgo?.key]?.explain, amberTone],
                   ['Zero-day', ALGO_VISUAL_METRICS[selAlgo?.key]?.zeroDay, '#ff1744'],
-                  ['Stream', ALGO_VISUAL_METRICS[selAlgo?.key]?.stream, '#9fc2ea'],
+                  ['Stream', ALGO_VISUAL_METRICS[selAlgo?.key]?.stream, cyanSoft],
                 ].map(([label, value, color]) => (
-                  <div key={label} style={{ padding: 10, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.4)' }}>
+                  <div key={label} style={{ padding: 10, border: '1px solid var(--border2)', background: panelGlow }}>
                     <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 5 }}>{label}</div>
                     <div style={{ color, fontFamily: 'Orbitron,monospace', fontSize: 18 }}>{value}%</div>
                   </div>
@@ -2966,11 +2992,11 @@ function InsightsPage({ initialTab = 'threats' }) {
                 return (
                   <div key={item.v} style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 4, fontSize: 12 }}>
-                      <span style={{ color: '#94b4c8' }}>{item.l}</span>
+                      <span style={{ color: cyanSoft }}>{item.l}</span>
                       <span style={{ color: '#39ff14', fontFamily: 'Share Tech Mono' }}>{threatFit}%</span>
                     </div>
                     <div style={{ height: 4, background: 'var(--border2)' }}>
-                      <div style={{ width: `${threatFit}%`, height: '100%', background: 'linear-gradient(90deg,#39ff14,#9fc2ea)' }}/>
+                      <div style={{ width: `${threatFit}%`, height: '100%', background: `linear-gradient(90deg,#39ff14,${cyanSoft})` }}/>
                     </div>
                   </div>
                 );
@@ -2978,11 +3004,11 @@ function InsightsPage({ initialTab = 'threats' }) {
               <div style={{ marginTop: 16 }}>
                 {Object.entries(ALGO_VISUAL_METRICS[selAlgo?.key] || {}).map(([metric, value]) => (
                   <div key={metric} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ minWidth: 120, color: '#94b4c8', fontSize: 12 }}>{metric}</span>
+                    <span style={{ minWidth: 120, color: cyanSoft, fontSize: 12 }}>{metric}</span>
                     <div style={{ flex: 1, height: 6, background: 'var(--border2)' }}>
                       <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${algoColor(selAlgo?.type)}, rgba(255,255,255,.9))` }}/>
                     </div>
-                    <span style={{ minWidth: 36, color: '#9fc2ea', fontFamily: 'Share Tech Mono', fontSize: 11 }}>{value}%</span>
+                    <span style={{ minWidth: 36, color: cyanSoft, fontFamily: 'Share Tech Mono', fontSize: 11 }}>{value}%</span>
                   </div>
                 ))}
               </div>
@@ -3000,7 +3026,7 @@ function InsightsPage({ initialTab = 'threats' }) {
       {tab === 'datasets' && (
         <div style={{ display: 'grid', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 14 }}>
-            <Panel title="DATASET TUSHUNCHASI" color="#ffab00">
+            <Panel title="DATASET TUSHUNCHASI" color={amberTone}>
               <div className="panel-body" style={{ display: 'grid', gap: 12 }}>
                 <div style={{ color: '#dce8f5', fontSize: 14, lineHeight: 1.8 }}>
                   Bu bo&apos;lim qaysi dataset nimaga kerakligini sodda qilib ko&apos;rsatadi:
@@ -3013,7 +3039,7 @@ function InsightsPage({ initialTab = 'threats' }) {
                     ['Modern attack taxonomy', 'UNSW-NB15'],
                     ['IoT va botnet', 'TON_IoT / Bot-IoT'],
                   ].map(([label, value]) => (
-                    <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+                    <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
                       <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>{label}</div>
                       <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700 }}>{value}</div>
                     </div>
@@ -3022,7 +3048,7 @@ function InsightsPage({ initialTab = 'threats' }) {
               </div>
             </Panel>
             <Panel title="QANDAY TANLASH KERAK" color="#39ff14">
-              <div className="panel-body" style={{ display: 'grid', gap: 10, fontSize: 12, color: '#9fc2ea', lineHeight: 1.7 }}>
+              <div className="panel-body" style={{ display: 'grid', gap: 10, fontSize: 12, color: cyanSoft, lineHeight: 1.7 }}>
                 <div>1. Agar demo uchun eng tushunarli va boy dataset kerak bo&apos;lsa: <span style={{ color: '#dce8f5' }}>CICIDS2017</span>.</div>
                 <div>2. Agar sizga eski IDS benchmark kerak bo&apos;lsa: <span style={{ color: '#dce8f5' }}>NSL-KDD</span>.</div>
                 <div>3. Agar zero-day yoki anomaly yondashuvini ko&apos;rsatmoqchi bo&apos;lsangiz: <span style={{ color: '#dce8f5' }}>UNSW-NB15</span> yoki <span style={{ color: '#dce8f5' }}>TON_IoT</span>.</div>
@@ -3041,27 +3067,27 @@ function InsightsPage({ initialTab = 'threats' }) {
 
       {tab === 'siem' && (
         <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 14 }}>
-          <Panel title="SIEM TIZIMLAR" color="#00e5ff">
+          <Panel title="SIEM TIZIMLAR" color={cyan}>
             <div style={{ padding: '6px 0' }}>
               {SIEM_TOOLS.map(s => (
                 <div key={s.key} onClick={() => setSelSiem(s)} style={{
                   padding: '12px 16px', cursor: 'pointer',
-                  borderLeft: `2px solid ${selSiem?.key === s.key ? 'var(--cyan)' : 'transparent'}`,
-                  background: selSiem?.key === s.key ? 'rgba(0,229,255,.08)' : 'transparent',
+                  borderLeft: `2px solid ${selSiem?.key === s.key ? cyan : 'transparent'}`,
+                  background: selSiem?.key === s.key ? panelGlowStrong : 'transparent',
                   transition: 'all .15s',
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: selSiem?.key === s.key ? 'var(--cyan)' : 'var(--text)', marginBottom: 2 }}>{s.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: selSiem?.key === s.key ? cyan : 'var(--text)', marginBottom: 2 }}>{s.name}</div>
                   <div style={{ fontSize: 10, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>{s.sub}</div>
                 </div>
               ))}
             </div>
           </Panel>
-          <Panel title={selSiem?.name?.toUpperCase() || ''} color="#00e5ff">
+          <Panel title={selSiem?.name?.toUpperCase() || ''} color={cyan}>
             <div className="panel-body">
-              <div style={{ marginBottom: 14, padding: 14, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+              <div style={{ marginBottom: 14, padding: 14, border: '1px solid var(--border2)', background: panelGlow }}>
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{selSiem?.name}</div>
-                <div style={{ fontSize: 11, color: '#7ab8d4', fontFamily: 'Share Tech Mono', marginBottom: 10 }}>{selSiem?.best}</div>
-                <p style={{ fontSize: 14, color: '#94b4c8', lineHeight: 1.8 }}>{selSiem?.detail}</p>
+                <div style={{ fontSize: 11, color: cyanDim, fontFamily: 'Share Tech Mono', marginBottom: 10 }}>{selSiem?.best}</div>
+                <p style={{ fontSize: 14, color: cyanSoft, lineHeight: 1.8 }}>{selSiem?.detail}</p>
               </div>
               <SIEMArchitecturePanel tool={selSiem}/>
             </div>
@@ -3074,10 +3100,16 @@ function InsightsPage({ initialTab = 'threats' }) {
 
 function SIEMPage() {
   const [selected, setSelected] = useState(SIEM_TOOLS[0]);
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelGlowStrong = themeAccent('panelGlowStrong', 'rgba(0,229,255,.08)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
 
   return (
     <div style={{ animation: 'fadeUp .3s ease', display: 'grid', gap: 14 }}>
-      <Panel title="SIEM TIZIMLAR INTEGRATSIYASI" color="#00e5ff">
+      <Panel title="SIEM TIZIMLAR INTEGRATSIYASI" color={cyan}>
         <div className="panel-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 10 }}>
             {SIEM_TOOLS.map(tool => {
@@ -3088,24 +3120,24 @@ function SIEMPage() {
                   onClick={() => setSelected(tool)}
                   style={{
                     padding: 14,
-                    border: `1px solid ${active ? 'rgba(159,194,234,.85)' : 'var(--border2)'}`,
-                    background: active ? 'rgba(159,194,234,.14)' : 'rgba(13,27,46,.55)',
+                    border: `1px solid ${active ? panelBorder : 'var(--border2)'}`,
+                    background: active ? panelGlowStrong : panelGlow,
                     cursor: 'pointer',
                     transition: 'all .18s',
                     minHeight: 86,
                   }}
                 >
-                  <div style={{ fontSize: 18, fontWeight: 700, color: active ? '#d9e9fb' : 'var(--text)' }}>{tool.name}</div>
-                  <div style={{ fontSize: 11, color: '#8eb6db', marginTop: 4, fontFamily: 'Share Tech Mono' }}>{tool.sub}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: active ? cyanSoft : 'var(--text)' }}>{tool.name}</div>
+                  <div style={{ fontSize: 11, color: cyanDim, marginTop: 4, fontFamily: 'Share Tech Mono' }}>{tool.sub}</div>
                   <div style={{ fontSize: 11, color: '#4a6a84', marginTop: 10 }}>{tool.vendor}</div>
                 </div>
               );
             })}
           </div>
-          <div style={{ padding: 18, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.48)' }}>
+          <div style={{ padding: 18, border: '1px solid var(--border2)', background: panelGlow }}>
             <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{selected.name}</div>
-            <div style={{ fontSize: 12, color: '#7ab8d4', fontFamily: 'Share Tech Mono', marginBottom: 14 }}>{selected.best}</div>
-            <div style={{ fontSize: 14, color: '#a5c2d8', lineHeight: 1.8 }}>{selected.detail}</div>
+            <div style={{ fontSize: 12, color: cyanDim, fontFamily: 'Share Tech Mono', marginBottom: 14 }}>{selected.best}</div>
+            <div style={{ fontSize: 14, color: cyanSoft, lineHeight: 1.8 }}>{selected.detail}</div>
           </div>
           <div style={{ marginTop: 12 }}>
             <SIEMArchitecturePanel tool={selected}/>
@@ -3114,9 +3146,9 @@ function SIEMPage() {
       </Panel>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr', gap: 14 }}>
-        <Panel title="SIEM QOBILIYATLARI" color="#9fc2ea">
+        <Panel title="SIEM QOBILIYATLARI" color={cyanSoft}>
           <div className="panel-body">
-            <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.45)', color: '#a5c2d8', fontSize: 13, lineHeight: 1.75 }}>
+            <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border2)', background: panelGlow, color: cyanSoft, fontSize: 13, lineHeight: 1.75 }}>
               Bu jadval har bir SIEM mahsuloti qaysi yo&apos;nalishda kuchli ekanini ko&apos;rsatadi.
               `Real vaqt` yuqori bo&apos;lsa alert tez chiqadi, `ML/AI` yuqori bo&apos;lsa anomaly va behavior analytics kuchliroq bo&apos;ladi,
               `Narx samaradorligi` yuqori bo&apos;lsa umumiy xarajatga nisbatan foyda yaxshiroq bo&apos;ladi.
@@ -3124,10 +3156,10 @@ function SIEMPage() {
             {SIEM_CAPABILITY_ROWS.map(row => (
               <div key={row.key} style={{ marginBottom: 18 }}>
                 <div style={{ marginBottom: 4, color: 'var(--text)', fontSize: 13, fontWeight: 700 }}>{row.label}</div>
-                <div style={{ marginBottom: 8, color: '#7ab8d4', fontSize: 12 }}>{row.desc}</div>
+                <div style={{ marginBottom: 8, color: cyanDim, fontSize: 12 }}>{row.desc}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
                   {SIEM_TOOLS.map(tool => (
-                    <div key={`${row.key}-${tool.key}`} style={{ background: 'rgba(13,27,46,.55)', border: '1px solid var(--border2)', padding: 6 }}>
+                    <div key={`${row.key}-${tool.key}`} style={{ background: panelGlow, border: '1px solid var(--border2)', padding: 6 }}>
                       <div style={{ height: 42, background: 'rgba(255,255,255,.04)', position: 'relative', overflow: 'hidden', marginBottom: 6 }}>
                         <div style={{
                           position: 'absolute',
@@ -3135,10 +3167,10 @@ function SIEMPage() {
                           right: 0,
                           bottom: 0,
                           height: `${tool.scores[row.key]}%`,
-                          background: `linear-gradient(180deg, ${row.color}, rgba(159,194,234,.75))`,
+                          background: `linear-gradient(180deg, ${row.color}, ${cyanSoft})`,
                         }}/>
                       </div>
-                      <div style={{ fontSize: 10, color: '#7b9dbd', textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.name.split(' ')[0]}</div>
+                      <div style={{ fontSize: 10, color: cyanDim, textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.name.split(' ')[0]}</div>
                       <div style={{ marginTop: 4, fontSize: 11, color: row.color, textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.scores[row.key]}%</div>
                     </div>
                   ))}
@@ -3150,7 +3182,7 @@ function SIEMPage() {
 
         <Panel title="LOYIHA MOSLIGI" color="#39ff14">
           <div className="panel-body" style={{ display: 'grid', gap: 10 }}>
-            <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.45)', color: '#a5c2d8', fontSize: 13, lineHeight: 1.75 }}>
+            <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow, color: cyanSoft, fontSize: 13, lineHeight: 1.75 }}>
               Bu blok “qaysi turdagi tashkilot yoki loyiha uchun qaysi SIEM ko&apos;proq mos” degan tez tavsiyani beradi.
               Ya&apos;ni bu benchmark emas, tanlovni soddalashtiruvchi amaliy yo&apos;l-yo&apos;riq.
             </div>
@@ -3160,7 +3192,7 @@ function SIEMPage() {
               ['Ochiq kod', 'ELK / Wazuh'],
               ['Yengil SOC', 'Graylog'],
             ].map(([k, v]) => (
-              <div key={k} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.5)' }}>
+              <div key={k} style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
                 <div style={{ fontSize: 11, color: '#4a6a84', marginBottom: 4 }}>{k}</div>
                 <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700 }}>{v}</div>
               </div>
