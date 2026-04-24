@@ -1,5 +1,6 @@
+from textwrap import dedent
+
 from django.utils import timezone
-from pathlib import Path
 
 from django.http import HttpResponse
 from django.utils.dateparse import parse_datetime
@@ -83,7 +84,409 @@ LOCAL_AGENT_SCRIPT_LABELS = {
     'install_local_scan_protocol.bat': 'local-agent-install.bat',
     'start_local_agent.bat': 'local-agent-start.bat',
     'enable_local_scan.bat': 'local-agent-enable.bat',
+    'launch_local_agent.ps1': 'launch_local_agent.ps1',
 }
+
+
+LOCAL_AGENT_LAUNCHER_SCRIPT = dedent(
+    r"""
+    param(
+        [string]$Uri = ''
+    )
+
+    $ErrorActionPreference = 'Stop'
+    $healthUrl = 'http://127.0.0.1:8765/health'
+
+    try {
+        Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 2 | Out-Null
+        exit 0
+    } catch {
+    }
+
+    function Send-Json {
+        param(
+            [System.Net.HttpListenerResponse]$Response,
+            [int]$StatusCode,
+            [object]$Payload
+        )
+
+        $json = $Payload | ConvertTo-Json -Depth 8 -Compress
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+        $Response.StatusCode = $StatusCode
+        $Response.ContentType = 'application/json; charset=utf-8'
+        $Response.ContentEncoding = [System.Text.Encoding]::UTF8
+        $Response.Headers['Access-Control-Allow-Origin'] = '*'
+        $Response.Headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        $Response.Headers['Access-Control-Allow-Headers'] = 'content-type, x-api-key'
+        $Response.OutputStream.Write($bytes, 0, $bytes.Length)
+        $Response.OutputStream.Close()
+    }
+
+    function Get-DefaultGateway {
+        try {
+            $gateway = Get-CimInstance Win32_NetworkAdapterConfiguration |
+                Where-Object { $_.IPEnabled -and $_.DefaultIPGateway } |
+                Select-Object -First 1
+            if ($gateway -and $gateway.DefaultIPGateway.Count -gt 0) {
+                return $gateway.DefaultIPGateway[0]
+            }
+        } catch {
+        }
+        return $null
+    }
+
+    function Get-InterfaceRows {
+        $rows = @()
+        try {
+            $configs = Get-NetIPConfiguration | Where-Object { $_.IPv4Address -and $_.NetAdapter.Status -eq 'Up' }
+            foreach ($cfg in $configs) {
+                $rows += [ordered]@{
+                    name = $cfg.InterfaceAlias
+                    ssid = ''
+                    gateway = ($cfg.IPv4DefaultGateway.NextHop | Select-Object -First 1)
+                    subnet_cidr = ($cfg.IPv4Address | Select-Object -First 1).IPAddress
+                    ipv4 = ($cfg.IPv4Address | Select-Object -First 1).IPAddress
+                    source = 'local-agent'
+                }
+            }
+        } catch {
+            try {
+                $configs = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -and $_.IPAddress }
+                foreach ($cfg in $configs) {
+                    $ipv4 = $cfg.IPAddress | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' } | Select-Object -First 1
+                    if ($ipv4) {
+                        $rows += [ordered]@{
+                            name = $cfg.Description
+                            ssid = ''
+                            gateway = ($cfg.DefaultIPGateway | Select-Object -First 1)
+                            subnet_cidr = $ipv4
+                            ipv4 = $ipv4
+                            source = 'local-agent'
+                        }
+                    }
+                }
+            } catch {
+            }
+        }
+        return @($rows)
+    }
+
+    function Get-WifiStatusRow {
+        $interfaces = Get-InterfaceRows
+        $primary = $interfaces | Select-Object -First 1
+        return [ordered]@{
+            connected = [bool]$primary
+            ssid = ''
+            interface_name = if ($primary) { $primary.name } else { '' }
+            ipv4 = if ($primary) { $primary.ipv4 } else { '' }
+            gateway = if ($primary) { $primary.gateway } else { '' }
+            source = 'local-agent'
+        }
+    }
+
+    function Get-OpenPorts {
+        param([string]$Ip)
+
+        $portsToCheck = @(53, 80, 135, 139, 443, 445, 3389, 5432)
+        $open = @()
+        foreach ($port in $portsToCheck) {
+            try {
+                $client = New-Object System.Net.Sockets.TcpClient
+                $async = $client.BeginConnect($Ip, $port, $null, $null)
+                if ($async.AsyncWaitHandle.WaitOne(180, $false) -and $client.Connected) {
+                    $open += $port
+                }
+                $client.Close()
+            } catch {
+            }
+        }
+        return @($open)
+    }
+
+    function Get-RiskLevel {
+        param(
+            [string]$Ip,
+            [int[]]$OpenPorts
+        )
+
+        $score = 0
+        $score += [Math]::Min($OpenPorts.Count, 6) * 12
+        foreach ($port in $OpenPorts) {
+            if ($port -in @(135, 139, 445, 3389, 5432)) {
+                $score += 14
+            }
+        }
+        if ($Ip.EndsWith('.1')) {
+            $score += 10
+        }
+        if ($score -ge 85) { return 'critical' }
+        if ($score -ge 55) { return 'high' }
+        if ($score -ge 28) { return 'medium' }
+        return 'low'
+    }
+
+    function Get-DeviceName {
+        param(
+            [string]$Ip,
+            [int[]]$OpenPorts,
+            [bool]$IsGateway = $false,
+            [bool]$IsWorkstation = $false
+        )
+
+        if ($IsGateway -or $Ip.EndsWith('.1')) { return 'Gateway/Router' }
+        if ($IsWorkstation) { return 'Analyst Workstation' }
+        if ($OpenPorts -contains 5432) { return 'Database Host' }
+        if (($OpenPorts -contains 80) -or ($OpenPorts -contains 443)) { return 'Web Device' }
+        if ($OpenPorts.Count -gt 0) { return 'Server/Remote Host' }
+        return 'Detected Host'
+    }
+
+    function Get-NetworkType {
+        param([string]$Ip)
+        if ($Ip -like '192.168.*') { return 'LAN (uy/ofis tarmogi)' }
+        if ($Ip -like '10.*') { return 'LAN (korporativ tarmoq)' }
+        if ($Ip -match '^172\.(1[6-9]|2[0-9]|3[0-1])\.') { return 'LAN (virtual tarmoq)' }
+        if ($Ip -eq '127.0.0.1') { return 'Loopback (localhost)' }
+        return 'WAN (internet)'
+    }
+
+    function Get-NetworkDevices {
+        $interfaces = Get-InterfaceRows
+        $gateway = Get-DefaultGateway
+        $arpText = ''
+        try {
+            $arpText = arp -a | Out-String
+        } catch {
+        }
+
+        $candidateIps = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($iface in $interfaces) {
+            if ($iface.ipv4) { [void]$candidateIps.Add($iface.ipv4) }
+            if ($iface.gateway) { [void]$candidateIps.Add($iface.gateway) }
+        }
+
+        foreach ($match in ([regex]'\b\d{1,3}(?:\.\d{1,3}){3}\b').Matches($arpText)) {
+            $ip = $match.Value
+            if ($ip -ne '255.255.255.255' -and $ip -notlike '224.*' -and $ip -notlike '239.*') {
+                [void]$candidateIps.Add($ip)
+            }
+        }
+
+        $deviceMap = @{}
+        foreach ($ip in $candidateIps | Select-Object -Unique) {
+            if ($ip -notmatch '^\d+\.\d+\.\d+\.\d+$') { continue }
+            $openPorts = Get-OpenPorts -Ip $ip
+            $isGateway = $gateway -and $ip -eq $gateway
+            $isWorkstation = ($interfaces | Where-Object { $_.ipv4 -eq $ip }).Count -gt 0
+            $deviceMap[$ip] = [ordered]@{
+                ip = $ip
+                name = Get-DeviceName -Ip $ip -OpenPorts $openPorts -IsGateway:$isGateway -IsWorkstation:$isWorkstation
+                mac = 'N/A'
+                risk = Get-RiskLevel -Ip $ip -OpenPorts $openPorts
+                network_type = Get-NetworkType -Ip $ip
+                status = 'online'
+                open_ports = @($openPorts)
+                source = 'local-agent'
+            }
+        }
+
+        return @($deviceMap.Values | Sort-Object ip)
+    }
+
+    function Read-RequestBody {
+        param([System.Net.HttpListenerRequest]$Request)
+        if (-not $Request.HasEntityBody) { return @{} }
+        $reader = New-Object System.IO.StreamReader($Request.InputStream, $Request.ContentEncoding)
+        $body = $reader.ReadToEnd()
+        $reader.Close()
+        if ([string]::IsNullOrWhiteSpace($body)) { return @{} }
+        try {
+            return $body | ConvertFrom-Json -AsHashtable
+        } catch {
+            return @{}
+        }
+    }
+
+    $listener = [System.Net.HttpListener]::new()
+    $listener.Prefixes.Add('http://127.0.0.1:8765/')
+    $listener.Start()
+
+    while ($listener.IsListening) {
+        try {
+            $context = $listener.GetContext()
+            $request = $context.Request
+            $response = $context.Response
+            $path = $request.Url.AbsolutePath.TrimEnd('/')
+            if ([string]::IsNullOrEmpty($path)) { $path = '/' }
+
+            if ($request.HttpMethod -eq 'OPTIONS') {
+                Send-Json -Response $response -StatusCode 200 -Payload @{ ok = $true }
+                continue
+            }
+
+            if ($request.HttpMethod -eq 'GET' -and $path -eq '/health') {
+                Send-Json -Response $response -StatusCode 200 -Payload @{
+                    status = 'ok'
+                    agent = 'cyberguard-local-agent'
+                    mode = 'portable-powershell'
+                }
+                continue
+            }
+
+            if ($request.HttpMethod -eq 'GET' -and $path -eq '/network/interfaces') {
+                $items = Get-InterfaceRows
+                Send-Json -Response $response -StatusCode 200 -Payload @{
+                    interfaces = $items
+                    total = $items.Count
+                    source = 'local-agent'
+                }
+                continue
+            }
+
+            if ($request.HttpMethod -eq 'GET' -and $path -eq '/network/wifi/status') {
+                Send-Json -Response $response -StatusCode 200 -Payload (Get-WifiStatusRow)
+                continue
+            }
+
+            if ($request.HttpMethod -eq 'GET' -and $path -eq '/network/scan') {
+                $devices = Get-NetworkDevices
+                Send-Json -Response $response -StatusCode 200 -Payload @{
+                    devices = $devices
+                    total = $devices.Count
+                    source = 'local-agent'
+                }
+                continue
+            }
+
+            if ($path -eq '/network/wifi/connect') {
+                Send-Json -Response $response -StatusCode 501 -Payload @{
+                    error = 'Wi-Fi connect portable agentda hozircha yoq.'
+                }
+                continue
+            }
+
+            if ($path -eq '/scan-ip') {
+                $targetIp = ''
+                if ($request.HttpMethod -eq 'GET') {
+                    $targetIp = $request.QueryString['ip']
+                } elseif ($request.HttpMethod -eq 'POST') {
+                    $payload = Read-RequestBody -Request $request
+                    $targetIp = $payload['ip_address']
+                }
+
+                if (-not $targetIp) {
+                    Send-Json -Response $response -StatusCode 400 -Payload @{ error = 'IP kiritilmadi.' }
+                    continue
+                }
+
+                $openPorts = Get-OpenPorts -Ip $targetIp
+                Send-Json -Response $response -StatusCode 200 -Payload @{
+                    ip = $targetIp
+                    open_ports = @($openPorts)
+                    requested_ports = @()
+                    timeout_seconds = 0.18
+                    source = 'local-agent'
+                }
+                continue
+            }
+
+            Send-Json -Response $response -StatusCode 404 -Payload @{ error = 'Not found' }
+        } catch {
+            if ($context -and $context.Response) {
+                Send-Json -Response $context.Response -StatusCode 500 -Payload @{ error = $_.Exception.Message }
+            }
+        }
+    }
+    """
+).strip()
+
+
+def _local_agent_download_base(request) -> str:
+    if request.headers.get('X-Forwarded-Proto'):
+        proto = request.headers['X-Forwarded-Proto'].split(',')[0].strip()
+        host = request.headers.get('X-Forwarded-Host') or request.get_host()
+        return f'{proto}://{host}'
+    return request.build_absolute_uri('/').rstrip('/')
+
+
+def _build_install_script(base_url: str) -> str:
+    launcher_url = f'{base_url}/api/local-agent/download/launch_local_agent.ps1/'
+    return '\r\n'.join([
+        '@echo off',
+        'setlocal',
+        'set "APPDIR=%LOCALAPPDATA%\\CyberGuardLocalAgent"',
+        'if not exist "%APPDIR%" mkdir "%APPDIR%"',
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri \\"{launcher_url}\\" -OutFile \\"%APPDIR%\\launch_local_agent.ps1\\""',
+        'if errorlevel 1 (',
+        '  echo launch_local_agent.ps1 yuklab olinmadi.',
+        '  exit /b 1',
+        ')',
+        'powershell -NoProfile -ExecutionPolicy Bypass -Command "$launcher = Join-Path $env:LOCALAPPDATA \'CyberGuardLocalAgent\\launch_local_agent.ps1\'; $baseKey = \'HKCU:\\Software\\Classes\\cyberguard-agent\'; $commandKey = Join-Path $baseKey \'shell\\open\\command\'; $commandValue = \'powershell.exe -ExecutionPolicy Bypass -File `"\'+$launcher+\'`" `"%1`"\'; New-Item -Path $baseKey -Force | Out-Null; New-ItemProperty -Path $baseKey -Name \'URL Protocol\' -Value \'\' -PropertyType String -Force | Out-Null; New-Item -Path $commandKey -Force | Out-Null; Set-ItemProperty -Path $baseKey -Name \'(default)\' -Value \'URL:CyberGuard Local Agent\' -Force; Set-ItemProperty -Path $commandKey -Name \'(default)\' -Value $commandValue -Force"',
+        'echo cyberguard-agent:// protokoli ornatildi.',
+        'echo Endi RUN LOCAL SCAN tugmasi local agentni ishga tushira oladi.',
+        'endlocal',
+    ]) + '\r\n'
+
+
+def _build_start_script(base_url: str) -> str:
+    launcher_url = f'{base_url}/api/local-agent/download/launch_local_agent.ps1/'
+    return '\r\n'.join([
+        '@echo off',
+        'setlocal',
+        'set "APPDIR=%LOCALAPPDATA%\\CyberGuardLocalAgent"',
+        'if not exist "%APPDIR%" mkdir "%APPDIR%"',
+        'if not exist "%APPDIR%\\launch_local_agent.ps1" (',
+        f'  powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri \\"{launcher_url}\\" -OutFile \\"%APPDIR%\\launch_local_agent.ps1\\""',
+        ')',
+        'if not exist "%APPDIR%\\launch_local_agent.ps1" (',
+        '  echo launch_local_agent.ps1 topilmadi.',
+        '  exit /b 1',
+        ')',
+        'start "CyberGuard Local Agent" powershell -NoProfile -ExecutionPolicy Bypass -File "%APPDIR%\\launch_local_agent.ps1"',
+        'echo Local agent ishga tushirildi. 3-5 soniya kutib RUN LOCAL SCAN bosing.',
+        'endlocal',
+    ]) + '\r\n'
+
+
+def _build_enable_script(base_url: str) -> str:
+    install_url = f'{base_url}/api/local-agent/download/install_local_scan_protocol.bat/'
+    start_url = f'{base_url}/api/local-agent/download/start_local_agent.bat/'
+    return '\r\n'.join([
+        '@echo off',
+        'setlocal',
+        'set "APPDIR=%LOCALAPPDATA%\\CyberGuardLocalAgent"',
+        'if not exist "%APPDIR%" mkdir "%APPDIR%"',
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri \\"{install_url}\\" -OutFile \\"%APPDIR%\\install_local_scan_protocol.bat\\""',
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri \\"{start_url}\\" -OutFile \\"%APPDIR%\\start_local_agent.bat\\""',
+        'if not exist "%APPDIR%\\install_local_scan_protocol.bat" (',
+        '  echo install_local_scan_protocol.bat yuklab olinmadi.',
+        '  exit /b 1',
+        ')',
+        'if not exist "%APPDIR%\\start_local_agent.bat" (',
+        '  echo start_local_agent.bat yuklab olinmadi.',
+        '  exit /b 1',
+        ')',
+        'call "%APPDIR%\\install_local_scan_protocol.bat"',
+        'call "%APPDIR%\\start_local_agent.bat"',
+        'endlocal',
+    ]) + '\r\n'
+
+
+def _get_local_agent_script_content(request, script_name: str) -> tuple[str | None, str | None]:
+    if script_name not in LOCAL_AGENT_SCRIPT_LABELS:
+        return None, None
+
+    if script_name == 'launch_local_agent.ps1':
+        return LOCAL_AGENT_LAUNCHER_SCRIPT.replace('\n', '\r\n') + '\r\n', 'text/plain; charset=utf-8'
+
+    base_url = _local_agent_download_base(request)
+    if script_name == 'install_local_scan_protocol.bat':
+        return _build_install_script(base_url), 'application/x-bat'
+    if script_name == 'start_local_agent.bat':
+        return _build_start_script(base_url), 'application/x-bat'
+    if script_name == 'enable_local_scan.bat':
+        return _build_enable_script(base_url), 'application/x-bat'
+    return None, None
 
 
 @extend_schema(tags=['Dashboard'], responses=DashboardStatsSerializer)
@@ -183,60 +586,12 @@ def scan_local_network(request):
 @extend_schema(exclude=True)
 @api_view(['GET'])
 def download_local_agent_script(request, script_name):
+    content, content_type = _get_local_agent_script_content(request, script_name)
     download_name = LOCAL_AGENT_SCRIPT_LABELS.get(script_name)
-    if not download_name:
+    if not content or not download_name:
         return Response({'error': 'Script topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
 
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / script_name
-    if not script_path.exists():
-        return Response({'error': 'Asosiy script topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
-
-    absolute_script = str(script_path)
-    lines = ['@echo off', 'setlocal']
-
-    if script_name == 'install_local_scan_protocol.bat':
-        lines.extend([
-            f'set "TARGET_SCRIPT={absolute_script}"',
-            'if not exist "%TARGET_SCRIPT%" (',
-            '  echo install_local_scan_protocol.bat topilmadi.',
-            '  exit /b 1',
-            ')',
-            'call "%TARGET_SCRIPT%"',
-        ])
-    elif script_name == 'start_local_agent.bat':
-        lines.extend([
-            f'set "TARGET_SCRIPT={absolute_script}"',
-            'if not exist "%TARGET_SCRIPT%" (',
-            '  echo start_local_agent.bat topilmadi.',
-            '  exit /b 1',
-            ')',
-            'call "%TARGET_SCRIPT%"',
-        ])
-    else:
-        install_script = str(repo_root / 'install_local_scan_protocol.bat')
-        start_script = str(repo_root / 'start_local_agent.bat')
-        lines.extend([
-            f'set "INSTALL_SCRIPT={install_script}"',
-            f'set "START_SCRIPT={start_script}"',
-            'if not exist "%INSTALL_SCRIPT%" (',
-            '  echo install_local_scan_protocol.bat topilmadi.',
-            '  exit /b 1',
-            ')',
-            'if not exist "%START_SCRIPT%" (',
-            '  echo start_local_agent.bat topilmadi.',
-            '  exit /b 1',
-            ')',
-            'echo [1/2] Local scan protocol o\'rnatilmoqda...',
-            'call "%INSTALL_SCRIPT%"',
-            'echo [2/2] Local agent ishga tushirilmoqda...',
-            'call "%START_SCRIPT%"',
-        ])
-
-    lines.append('endlocal')
-    content = '\r\n'.join(lines) + '\r\n'
-
-    response = HttpResponse(content, content_type='application/x-bat')
+    response = HttpResponse(content, content_type=content_type)
     response['Content-Disposition'] = f'attachment; filename="{download_name}"'
     return response
 
