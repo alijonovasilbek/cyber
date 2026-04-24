@@ -184,10 +184,10 @@ const DATASETS = [
 const SIEM_TOOLS = [
   { key:'splunk',   name:'Splunk',     sub:'SPL tili, MLTK',      vendor:'Splunk Inc.',  detail:'SPL qidiruv tili, MLTK ML plaginlari va CIM modeli bilan enterprise SOC uchun kuchli real vaqt analitika beradi.', best:'Enterprise SOC', scores:{ realtime:94, ml:92, cost:38 } },
   { key:'qradar',   name:'IBM QRadar', sub:'Watson AI',           vendor:'IBM',          detail:'Log, flow va asset korrelyatsiyasini Watson AI yordamida boyitadi. Large-scale incident triage uchun qulay.', best:'Large enterprise', scores:{ realtime:86, ml:79, cost:48 } },
-  { key:'sentinel', name:'MS Sentinel',sub:'Azure, KQL',          vendor:'Microsoft',    detail:'Azure-native SIEM/SOAR. KQL, Defender va Entra bilan juda yaxshi bog‘lanadi, cloud-first jamoalar uchun qulay.', best:'Cloud-first teams', scores:{ realtime:88, ml:84, cost:61 } },
-  { key:'elk',      name:'ELK Stack',  sub:'Ochiq kodli',         vendor:'Elastic',      detail:'Elasticsearch, Logstash va Kibana kombinatsiyasi. Moslashuvchan, ammo tuning va operatsion yuk ko‘proq talab qiladi.', best:'Custom pipelines', scores:{ realtime:72, ml:58, cost:82 } },
-  { key:'wazuh',    name:'Wazuh',      sub:'HIDS/SIEM',           vendor:'Wazuh',        detail:'Endpoint-centric monitoring, file integrity va rootkit aniqlash bilan kuchli. ELK bilan yaxshi tandem bo‘ladi.', best:'Endpoint visibility', scores:{ realtime:74, ml:52, cost:89 } },
-  { key:'graylog',  name:'Graylog',    sub:'Log boshqaruvi',      vendor:'Graylog',      detail:'Structured log tahlili, routing va alerting uchun soddaroq stack. O‘rta hajmli jamoalarda tez joriy etiladi.', best:'Mid-size SOC', scores:{ realtime:69, ml:41, cost:85 } },
+  { key:'sentinel', name:'MS Sentinel',sub:'Azure, KQL',          vendor:'Microsoft',    detail:"Azure-native SIEM/SOAR. KQL, Defender va Entra bilan juda yaxshi bog'lanadi, cloud-first jamoalar uchun qulay.", best:'Cloud-first teams', scores:{ realtime:88, ml:84, cost:61 } },
+  { key:'elk',      name:'ELK Stack',  sub:'Ochiq kodli',         vendor:'Elastic',      detail:"Elasticsearch, Logstash va Kibana kombinatsiyasi. Moslashuvchan, ammo tuning va operatsion yuk ko'proq talab qiladi.", best:'Custom pipelines', scores:{ realtime:72, ml:58, cost:82 } },
+  { key:'wazuh',    name:'Wazuh',      sub:'HIDS/SIEM',           vendor:'Wazuh',        detail:"Endpoint-centric monitoring, file integrity va rootkit aniqlash bilan kuchli. ELK bilan yaxshi tandem bo'ladi.", best:'Endpoint visibility', scores:{ realtime:74, ml:52, cost:89 } },
+  { key:'graylog',  name:'Graylog',    sub:'Log boshqaruvi',      vendor:'Graylog',      detail:"Structured log tahlili, routing va alerting uchun soddaroq stack. O'rta hajmli jamoalarda tez joriy etiladi.", best:'Mid-size SOC', scores:{ realtime:69, ml:41, cost:85 } },
 ];
 
 const SIEM_CAPABILITY_ROWS = [
@@ -272,12 +272,12 @@ const TOPOLOGY_SCENARIOS = {
   },
   attack: {
     label:'Hujum simulyatsiyasi',
-    summary:'Tashqi manbadan shubhali trafik keldi. Firewall va AI IDS web hamda DB yo‘nalishlarida xavfli oqimlarni ko‘rmoqda.',
+    summary:"Tashqi manbadan shubhali trafik keldi. Firewall va AI IDS web hamda DB yo'nalishlarida xavfli oqimlarni ko'rmoqda.",
     linkStates:{ ingress:'attack', web:'attack', db:'warn', mail:'ok', web_internal:'warn', db_internal:'warn', mail_internal:'ok', telemetry:'monitor' },
   },
   blocked: {
     label:'Bloklangan',
-    summary:'Hujum oqimi containment rejimiga o‘tdi. Firewall ingressni kesdi va faqat ichki servislar orasida minimal traffic qoldi.',
+    summary:"Hujum oqimi containment rejimiga o'tdi. Firewall ingressni kesdi va faqat ichki servislar orasida minimal traffic qoldi.",
     linkStates:{ ingress:'blocked', web:'ok', db:'ok', mail:'ok', web_internal:'ok', db_internal:'ok', mail_internal:'ok', telemetry:'monitor' },
   },
 };
@@ -288,27 +288,27 @@ const NETWORK_TYPE_GUIDES = [
     name: 'Star Topology',
     fit: 'Ofis LAN, switch-markazli tarmoq',
     summary: 'Barcha endpointlar bitta markaziy switch yoki firewallga ulanadi. Monitoring va segmentlash oson.',
-    pros: ['Fault isolation oson', 'Yangi host qo‘shish qulay', 'Central ACL / IDS uchun yaxshi'],
+    pros: ['Fault isolation oson', "Yangi host qo'shish qulay", 'Central ACL / IDS uchun yaxshi'],
   },
   {
     key: 'mesh',
     name: 'Mesh Topology',
     fit: 'Data center, high-availability segment',
-    summary: 'Node-lar bir nechta yo‘l orqali bog‘langan bo‘ladi. Redundancy kuchli, lekin murakkab.',
-    pros: ['Single point of failure past', 'Qo‘shimcha redundant path', 'Traffic engineering kuchli'],
+    summary: "Node-lar bir nechta yo'l orqali bog'langan bo'ladi. Redundancy kuchli, lekin murakkab.",
+    pros: ['Single point of failure past', "Qo'shimcha redundant path", 'Traffic engineering kuchli'],
   },
   {
     key: 'tree',
     name: 'Tree / Hierarchical',
     fit: 'Campus, enterprise branch arxitekturasi',
-    summary: 'Core, distribution va access qatlamlaridan tuzilgan ko‘p bosqichli model.',
+    summary: "Core, distribution va access qatlamlaridan tuzilgan ko'p bosqichli model.",
     pros: ['Katta tarmoqni boshqarish qulay', 'Policy qatlamlab beriladi', 'VLAN va zone segmentlash aniq'],
   },
   {
     key: 'hybrid',
     name: 'Hybrid / Zero Trust Overlay',
     fit: 'Cloud + on-prem + remote users',
-    summary: 'LAN, VPN, cloud va SaaS resurslari birga ishlaydi. Identity va telemetry markaziy rol o‘ynaydi.',
+    summary: "LAN, VPN, cloud va SaaS resurslari birga ishlaydi. Identity va telemetry markaziy rol o'ynaydi.",
     pros: ['Cloud integratsiya oson', 'Remote access moslashuvchan', 'Telemetry-driven access control'],
   },
   {
@@ -642,6 +642,15 @@ function Sidebar({ page, setPage, alertCount, mobileOpen, onClose, themeMode, on
         { id: 'threats', label: 'Tahdid Loglari', ico: 'TL', badge: alertCount },
       ],
     },
+    {
+      title: 'AI KENGAYTIRILGAN',
+      items: [
+        { id: 'ai_lab', label: 'AI Laboratoriya', ico: 'AI' },
+        { id: 'visualization', label: 'Vizualizatsiya', ico: 'VZ' },
+        { id: 'mitre', label: 'MITRE ATT&CK', ico: 'MT' },
+        { id: 'reports', label: 'Hisobotlar', ico: 'HR' },
+      ],
+    },
   ];
   return (
     <div className={`sidebar${mobileOpen ? ' open' : ''}`}>
@@ -710,6 +719,10 @@ function TopBar({ page, time, onMenuToggle, themeMode, onToggleTheme }) {
     topology: 'NETWORK TOPOLOGY MAP',
     insights: 'AI INSIGHTS',
     settings: 'SETTINGS',
+    ai_lab: 'AI LABORATORIYA — MODEL PERFORMANCE & CLUSTERING',
+    visualization: 'VIZUALIZATSIYA — TIMELINE & HEATMAP',
+    mitre: 'MITRE ATT&CK FRAMEWORK',
+    reports: 'HISOBOTLAR & EKSPORT',
   };
   return (
     <div className="topbar">
@@ -1316,19 +1329,19 @@ function NetworkPage({ onAnalyze }) {
   const localScanSteps = [
     {
       title: '1. Birinchi sozlash',
-      text: 'Shu kompyuterda faqat bir marta local protocol o‘rnating.',
+      text: "Shu kompyuterda faqat bir marta local protocol o'rnating.",
       bat: 'install_local_scan_protocol.bat',
       action: "Protocolni o'rnatish",
     },
     {
       title: '2. Local agentni yoqing',
-      text: 'Agent shu kompyuterning Wi-Fi, interface va lokal hostlarini o‘qiydi.',
+      text: "Agent shu kompyuterning Wi-Fi, interface va lokal hostlarini o'qiydi.",
       bat: 'start_local_agent.bat',
       action: 'Agentni ishga tushirish',
     },
     {
       title: '3. Saytdan ishga tushiring',
-      text: 'RUN LOCAL SCAN bosilganda sayt localhost agentga ulanadi va server emas, shu kompyuter tarmog‘ini ishlatadi.',
+      text: "RUN LOCAL SCAN bosilganda sayt localhost agentga ulanadi va server emas, shu kompyuter tarmog'ini ishlatadi.",
       bat: 'enable_local_scan.bat',
       action: 'Ikkalasini birga yoqish',
     },
@@ -1422,7 +1435,7 @@ function NetworkPage({ onAnalyze }) {
               {[
                 ['Onlayn hostlar', `${deviceStats.online}/${devices.length}`, '#39ff14'],
                 ['Yuqori xavf', `${deviceStats.risky} ta`, amberTone],
-                ['Ko‘p port ochiq', `${deviceStats.exposed} ta`, cyanSoft],
+                ["Ko'p port ochiq", `${deviceStats.exposed} ta`, cyanSoft],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ padding: 12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
                   <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 2, marginBottom: 6 }}>{label}</div>
@@ -1535,7 +1548,7 @@ function NetworkPage({ onAnalyze }) {
           }}>
             <div style={{ color: cyan, fontSize: 11, letterSpacing: 2, marginBottom: 10 }}>BAT FAYLLAR</div>
             {[
-              ['setup_project.bat', 'Birinchi o‘rnatish: venv, migrate, npm install'],
+              ['setup_project.bat', "Birinchi o'rnatish: venv, migrate, npm install"],
               ['start_backend.bat', 'Django/ASGI backendni yoqadi'],
               ['start_frontend.bat', 'Vite frontendni yoqadi'],
               ['start_all.bat', 'Backend va frontendni birga yoqadi'],
@@ -3027,106 +3040,290 @@ function InsightsPage({ initialTab = 'threats' }) {
 
 function SIEMPage() {
   const [selected, setSelected] = useState(SIEM_TOOLS[0]);
-  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyan  = themeAccent('cyan', '#00e5ff');
   const cyanSoft = themeAccent('cyanSoft', '#9fc2ea');
-  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
-  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
-  const panelGlowStrong = themeAccent('panelGlowStrong', 'rgba(0,229,255,.08)');
+  const cyanDim  = themeAccent('cyanDim', '#7ab8d4');
+  const green = '#39ff14';
+  const panelGlow   = themeAccent('panelGlow',   'rgba(0,229,255,.05)');
   const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
 
+  const toolType  = { splunk:'Enterprise', qradar:'Enterprise', sentinel:'Cloud', elk:'Open-source', wazuh:'Open-source', graylog:'Open-source' };
+  const typeColor = { Enterprise:'#ffab00', Cloud:'#00e5ff', 'Open-source':'#39ff14' };
+  const detail    = SIEM_DETAIL_MAP[selected.key] || { sources:[], pipeline:[], strengths:[], fit:[], ops:{} };
+
+  const FLOW_STEPS = [
+    { n:'01', title:'Log Yig\'ish',       desc:'Server, firewall, endpoint va cloud\'dan xavfsizlik hodisalari yig\'iladi' },
+    { n:'02', title:'Normallashtirish',   desc:'Turli formatlardagi loglar yagona standart ko\'rinishga o\'tkaziladi' },
+    { n:'03', title:'Korrelyatsiya',      desc:'AI va qoidalar orqali bog\'liq hodisalar birlashtiriladi va pattern topiladi' },
+    { n:'04', title:'Ogohlantirish',      desc:'Xavfli harakatlar uchun avtomatik alert va ticket yaratiladi' },
+    { n:'05', title:'Javob Berish',       desc:'SOC jamoasi yoki SOAR avtomatik tizimi tahdidni bartaraf etadi' },
+  ];
+
   return (
-    <div style={{ animation: 'fadeUp .3s ease', display: 'grid', gap: 14 }}>
-      <Panel title="SIEM TIZIMLAR INTEGRATSIYASI" color={cyan}>
+    <div style={{ animation:'fadeUp .3s ease', display:'grid', gap:14 }}>
+
+      {/* ── 1. SIEM NIMA? ──────────────────────────────────────── */}
+      <Panel title="SIEM — Security Information and Event Management" color={cyan}>
         <div className="panel-body">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1.2fr 1fr', gap:14 }}>
+            <div style={{ padding:16, border:`1px solid ${panelBorder}`, background:panelGlow }}>
+              <div style={{ fontSize:14, color:cyanSoft, lineHeight:2, marginBottom:10 }}>
+                <span style={{ color:cyan, fontWeight:700 }}>SIEM</span> — tashkilotdagi barcha qurilmalar, serverlar va
+                ilovalardan xavfsizlik hodisalarini <span style={{ color:green }}>yig'uvchi</span>,{' '}
+                <span style={{ color:'#ffab00' }}>tahlil qiluvchi</span> va real vaqtda{' '}
+                <span style={{ color:'#ff6b7f' }}>ogohlantirish beruvchi</span> markaziy platforma.
+              </div>
+              <div style={{ fontSize:12, color:cyanDim, lineHeight:1.8 }}>
+                SOC (Security Operations Center) mutaxassislari SIEM yordamida yuzlab tizimni
+                bitta konsoldan kuzatadi va kiberhujumlarni erta bosqichda aniqlaydi.
+              </div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              {[
+                { label:'SIEM nima qiladi?',  val:"Log yig'ish + tahlil",   color:cyan },
+                { label:'Kim foydalanadi?',   val:'SOC jamoalari',           color:green },
+                { label:'Asosiy maqsad',      val:'Tahdidni erta aniqlash',  color:'#ffab00' },
+                { label:'Natija',             val:'Alert + Incident',        color:'#ff6b7f' },
+              ].map(({ label, val, color }) => (
+                <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:`${color}08` }}>
+                  <div style={{ fontSize:10, color:'#4a6a84', marginBottom:5 }}>{label}</div>
+                  <div style={{ fontSize:13, color, fontFamily:'Share Tech Mono', lineHeight:1.4 }}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      {/* ── 2. SIEM QANDAY ISHLAYDI? ───────────────────────────── */}
+      <Panel title="SIEM QANDAY ISHLAYDI? — 5 ta ketma-ket bosqich" color={green}>
+        <div className="panel-body">
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:6, position:'relative' }}>
+            {FLOW_STEPS.map((step, i) => (
+              <div key={step.n} style={{ position:'relative' }}>
+                <div style={{
+                  padding:'14px 12px', border:`1px solid ${green}44`, background:`${green}07`,
+                  minHeight:130, display:'flex', flexDirection:'column', gap:8,
+                }}>
+                  <div style={{
+                    width:28, height:28, border:`1px solid ${green}88`, background:`${green}15`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontFamily:'Share Tech Mono', fontSize:12, color:green,
+                  }}>{step.n}</div>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{step.title}</div>
+                  <div style={{ fontSize:11, color:cyanDim, lineHeight:1.6, flex:1 }}>{step.desc}</div>
+                </div>
+                {i < 4 && (
+                  <div style={{
+                    position:'absolute', top:'50%', right:-10, transform:'translateY(-50%)',
+                    color:green, fontSize:20, zIndex:2, lineHeight:1,
+                  }}>›</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Panel>
+
+      {/* ── 3. TOOL TANLASH + DETAIL ───────────────────────────── */}
+      <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', gap:14 }}>
+        <Panel title="SIEM VOSITALARINI TANLANG" color={cyan}>
+          <div className="panel-body" style={{ display:'grid', gap:6 }}>
+            <div style={{ padding:'8px 10px', background:panelGlow, border:`1px solid ${panelBorder}`, fontSize:11, color:cyanDim, lineHeight:1.6, marginBottom:4 }}>
+              Bosib tanlang — o'ngda batafsil ma'lumot ko'rsatiladi
+            </div>
             {SIEM_TOOLS.map(tool => {
               const active = selected.key === tool.key;
+              const ttype  = toolType[tool.key];
+              const tcolor = typeColor[ttype];
               return (
                 <div
                   key={tool.key}
                   onClick={() => setSelected(tool)}
                   style={{
-                    padding: 14,
-                    border: `1px solid ${active ? panelBorder : 'var(--border2)'}`,
-                    background: active ? panelGlowStrong : panelGlow,
-                    cursor: 'pointer',
-                    transition: 'all .18s',
-                    minHeight: 86,
+                    padding:'10px 12px', border:`1px solid ${active ? panelBorder : 'var(--border2)'}`,
+                    background: active ? `${cyan}0e` : panelGlow,
+                    cursor:'pointer', transition:'all .18s',
+                    display:'flex', alignItems:'center', gap:10,
                   }}
                 >
-                  <div style={{ fontSize: 18, fontWeight: 700, color: active ? cyanSoft : 'var(--text)' }}>{tool.name}</div>
-                  <div style={{ fontSize: 11, color: cyanDim, marginTop: 4, fontFamily: 'Share Tech Mono' }}>{tool.sub}</div>
-                  <div style={{ fontSize: 11, color: '#4a6a84', marginTop: 10 }}>{tool.vendor}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: active ? cyanSoft : 'var(--text)' }}>{tool.name}</div>
+                    <div style={{ fontSize:10, color:cyanDim, marginTop:2, fontFamily:'Share Tech Mono' }}>{tool.sub}</div>
+                  </div>
+                  <div style={{
+                    fontSize:9, padding:'2px 7px', border:`1px solid ${tcolor}55`,
+                    background:`${tcolor}12`, color:tcolor, fontFamily:'Share Tech Mono', whiteSpace:'nowrap',
+                  }}>{ttype}</div>
                 </div>
               );
             })}
           </div>
-          <div style={{ padding: 18, border: '1px solid var(--border2)', background: panelGlow }}>
-            <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>{selected.name}</div>
-            <div style={{ fontSize: 12, color: cyanDim, fontFamily: 'Share Tech Mono', marginBottom: 14 }}>{selected.best}</div>
-            <div style={{ fontSize: 14, color: cyanSoft, lineHeight: 1.8 }}>{selected.detail}</div>
+        </Panel>
+
+        <Panel title={`TANLANGAN: ${selected.name.toUpperCase()}`} color={cyanSoft}>
+          <div className="panel-body" style={{ display:'grid', gap:10 }}>
+
+            {/* Tavsif */}
+            <div style={{ padding:14, border:`1px solid ${panelBorder}`, background:panelGlow }}>
+              <div style={{ fontSize:13, color:cyanSoft, lineHeight:1.85 }}>{selected.detail}</div>
+              <div style={{ marginTop:8, fontSize:12, color:'#4a6a84' }}>
+                Eng mos: <span style={{ color:cyan }}>{selected.best}</span>
+                <span style={{ marginLeft:16, color:typeColor[toolType[selected.key]] }}>[ {toolType[selected.key]} ]</span>
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {/* Ma'lumot manbalari */}
+              <div style={{ border:'1px solid var(--border2)', background:panelGlow, padding:14 }}>
+                <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>
+                  MA'LUMOT MANBALARI — qayerdan log keladi
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                  {detail.sources.map(s => (
+                    <span key={s} style={{
+                      padding:'4px 10px', border:`1px solid ${cyan}33`,
+                      background:`${cyan}0a`, color:cyanSoft, fontSize:11, fontFamily:'Share Tech Mono',
+                    }}>{s}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ishlash zanjiri */}
+              <div style={{ border:'1px solid var(--border2)', background:panelGlow, padding:14 }}>
+                <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>
+                  ISHLASH ZANJIRI — ma'lumot ichida qanday oqadi
+                </div>
+                <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                  {detail.pipeline.map((step, i) => (
+                    <React.Fragment key={step}>
+                      <span style={{
+                        padding:'5px 10px', border:`1px solid ${panelBorder}`,
+                        background:`${cyan}0d`, color:cyan, fontSize:11, fontFamily:'Share Tech Mono',
+                      }}>{step}</span>
+                      {i < detail.pipeline.length - 1 && (
+                        <span style={{ color:cyanDim, fontSize:14 }}>→</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {/* Operatsion ko'rsatkichlar */}
+              <div style={{ border:'1px solid var(--border2)', background:panelGlow, padding:14 }}>
+                <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:12 }}>
+                  OPERATSION KO'RSATKICHLAR
+                </div>
+                {[
+                  { label:"Tezkor joylash",  key:'deploy',   color:'#39ff14', hint:'qanchalik tez ishga tushadi' },
+                  { label:"Sozlash osonligi",key:'tuning',   color:'#ffab00', hint:'konfiguratsiya qanchalik oson' },
+                  { label:"O'rganish egri",  key:'learning', color:'#9fc2ea', hint:'xodim qanchalik tez o\'rganadi' },
+                ].map(({ label, key, color, hint }) => (
+                  <div key={key} style={{ marginBottom:14 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:2, fontSize:12 }}>
+                      <span style={{ color:cyanSoft }}>{label}</span>
+                      <span style={{ color, fontFamily:'Share Tech Mono' }}>{detail.ops[key] || 0}%</span>
+                    </div>
+                    <div style={{ fontSize:10, color:'#4a6a84', marginBottom:4 }}>{hint}</div>
+                    <div style={{ height:4, background:'var(--border2)' }}>
+                      <div style={{ width:`${detail.ops[key]||0}%`, height:'100%', background:`linear-gradient(90deg,${color},rgba(255,255,255,.7))` }}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Kuchli tomonlar + mos tashkilotlar */}
+              <div style={{ border:'1px solid var(--border2)', background:panelGlow, padding:14 }}>
+                <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>KUCHLI TOMONLARI</div>
+                {detail.strengths.map(item => (
+                  <div key={item} style={{ display:'flex', gap:8, marginBottom:8, alignItems:'flex-start' }}>
+                    <span style={{ color:green, fontFamily:'Share Tech Mono', fontSize:13 }}>+</span>
+                    <span style={{ color:cyanSoft, fontSize:12, lineHeight:1.5 }}>{item}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop:12, borderTop:'1px solid var(--border2)', paddingTop:10 }}>
+                  <div style={{ fontSize:10, color:'#4a6a84', marginBottom:6 }}>USHBU TASHKILOTLAR UCHUN QULAY:</div>
+                  {detail.fit.map(item => (
+                    <div key={item} style={{ color:cyan, fontSize:12, lineHeight:1.7 }}>• {item}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-          <div style={{ marginTop: 12 }}>
-            <SIEMArchitecturePanel tool={selected}/>
+        </Panel>
+      </div>
+
+      {/* ── 4. QOBILIYAT TAQQOSLASH ─────────────────────────────── */}
+      <Panel title="BARCHA 6 TA SIEM NI SOLISHTIRING — qobiliyat reytingi" color={cyanSoft}>
+        <div className="panel-body">
+          <div style={{ marginBottom:14, padding:12, border:'1px solid var(--border2)', background:panelGlow, fontSize:12, color:cyanSoft, lineHeight:1.8 }}>
+            Ustun qanchalik <span style={{ color:green }}>baland</span> bo'lsa, o'sha SIEM shu yo'nalishda shunchalik kuchli.{' '}
+            <span style={{ color:cyan }}>Real vaqt</span> — alert qanchalik tez chiqadi &nbsp;|&nbsp;
+            <span style={{ color:'#9fc2ea' }}>ML/AI</span> — anomaliya va xulq tahlili darajasi &nbsp;|&nbsp;
+            <span style={{ color:'#ffab00' }}>Narx samaradorligi</span> — xarajatga nisbatan foyda
+          </div>
+          {SIEM_CAPABILITY_ROWS.map(row => (
+            <div key={row.key} style={{ marginBottom:20 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:8 }}>
+                <div style={{ color:'var(--text)', fontSize:13, fontWeight:700 }}>{row.label}</div>
+                <div style={{ color:cyanDim, fontSize:11 }}>{row.desc}</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(6, minmax(0,1fr))', gap:6 }}>
+                {SIEM_TOOLS.map(tool => (
+                  <div
+                    key={`${row.key}-${tool.key}`}
+                    style={{
+                      background: selected.key === tool.key ? `${row.color}15` : panelGlow,
+                      border:`1px solid ${selected.key === tool.key ? `${row.color}66` : 'var(--border2)'}`,
+                      padding:8,
+                    }}
+                  >
+                    <div style={{ height:56, background:'rgba(255,255,255,.04)', position:'relative', overflow:'hidden', marginBottom:6 }}>
+                      <div style={{
+                        position:'absolute', left:0, right:0, bottom:0,
+                        height:`${tool.scores[row.key]}%`,
+                        background:`linear-gradient(180deg,${row.color},${cyanSoft})`,
+                      }}/>
+                      <div style={{
+                        position:'absolute', bottom:3, left:0, right:0,
+                        textAlign:'center', fontSize:10, color:'#fff', fontFamily:'Share Tech Mono',
+                      }}>{tool.scores[row.key]}%</div>
+                    </div>
+                    <div style={{ fontSize:10, color:cyanDim, textAlign:'center', fontFamily:'Share Tech Mono' }}>
+                      {tool.name.split(' ')[0]}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      {/* ── 5. QAYSI LOYIHA UCHUN QAYSI SIEM? ─────────────────── */}
+      <Panel title="QAYSI LOYIHA UCHUN QAYSI SIEM? — tez qaror qabul qiling" color={green}>
+        <div className="panel-body">
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+            {[
+              { type:'Katta korxona',     best:'Splunk / QRadar', why:'Yuzlab server, compliance va audit talablari mavjud',        color:'#ffab00' },
+              { type:'Azure / Cloud',     best:'MS Sentinel',     why:'Azure AD va Microsoft 365 bilan chuqur integratsiya kerak', color:'#00e5ff' },
+              { type:'Ochiq kod yechim',  best:'ELK / Wazuh',     why:'Byudjet cheklangan, IT jamoasi o\'zi sozlay oladi',         color:'#39ff14' },
+              { type:"O'rta hajmli SOC",  best:'Graylog',         why:'Tez deploy, kam operatsion yuk, sodda interfeys kerak',     color:'#9fc2ea' },
+            ].map(({ type, best, why, color }) => (
+              <div key={type} style={{ padding:16, border:`1px solid ${color}44`, background:`${color}07` }}>
+                <div style={{ fontSize:10, color:'#4a6a84', marginBottom:4, fontFamily:'Share Tech Mono' }}>HOLAT</div>
+                <div style={{ fontSize:13, color:'var(--text)', fontWeight:700, marginBottom:10 }}>{type}</div>
+                <div style={{ fontSize:10, color:'#4a6a84', marginBottom:4 }}>TAVSIYA</div>
+                <div style={{ fontSize:16, color, fontWeight:700, fontFamily:'Share Tech Mono', marginBottom:10 }}>{best}</div>
+                <div style={{ fontSize:11, color:cyanDim, lineHeight:1.6, borderTop:`1px solid ${color}22`, paddingTop:8, marginTop:4 }}>{why}</div>
+              </div>
+            ))}
           </div>
         </div>
       </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr', gap: 14 }}>
-        <Panel title="SIEM QOBILIYATLARI" color={cyanSoft}>
-          <div className="panel-body">
-            <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border2)', background: panelGlow, color: cyanSoft, fontSize: 13, lineHeight: 1.75 }}>
-              Bu jadval har bir SIEM mahsuloti qaysi yo&apos;nalishda kuchli ekanini ko&apos;rsatadi.
-              `Real vaqt` yuqori bo&apos;lsa alert tez chiqadi, `ML/AI` yuqori bo&apos;lsa anomaly va behavior analytics kuchliroq bo&apos;ladi,
-              `Narx samaradorligi` yuqori bo&apos;lsa umumiy xarajatga nisbatan foyda yaxshiroq bo&apos;ladi.
-            </div>
-            {SIEM_CAPABILITY_ROWS.map(row => (
-              <div key={row.key} style={{ marginBottom: 18 }}>
-                <div style={{ marginBottom: 4, color: 'var(--text)', fontSize: 13, fontWeight: 700 }}>{row.label}</div>
-                <div style={{ marginBottom: 8, color: cyanDim, fontSize: 12 }}>{row.desc}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
-                  {SIEM_TOOLS.map(tool => (
-                    <div key={`${row.key}-${tool.key}`} style={{ background: panelGlow, border: '1px solid var(--border2)', padding: 6 }}>
-                      <div style={{ height: 42, background: 'rgba(255,255,255,.04)', position: 'relative', overflow: 'hidden', marginBottom: 6 }}>
-                        <div style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: `${tool.scores[row.key]}%`,
-                          background: `linear-gradient(180deg, ${row.color}, ${cyanSoft})`,
-                        }}/>
-                      </div>
-                      <div style={{ fontSize: 10, color: cyanDim, textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.name.split(' ')[0]}</div>
-                      <div style={{ marginTop: 4, fontSize: 11, color: row.color, textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.scores[row.key]}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="LOYIHA MOSLIGI" color="#39ff14">
-          <div className="panel-body" style={{ display: 'grid', gap: 10 }}>
-            <div style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow, color: cyanSoft, fontSize: 13, lineHeight: 1.75 }}>
-              Bu blok “qaysi turdagi tashkilot yoki loyiha uchun qaysi SIEM ko&apos;proq mos” degan tez tavsiyani beradi.
-              Ya&apos;ni bu benchmark emas, tanlovni soddalashtiruvchi amaliy yo&apos;l-yo&apos;riq.
-            </div>
-            {[
-              ['Katta korxona', 'Splunk / QRadar'],
-              ['Azure infra', 'MS Sentinel'],
-              ['Ochiq kod', 'ELK / Wazuh'],
-              ['Yengil SOC', 'Graylog'],
-            ].map(([k, v]) => (
-              <div key={k} style={{ padding: 12, border: '1px solid var(--border2)', background: panelGlow }}>
-                <div style={{ fontSize: 11, color: '#4a6a84', marginBottom: 4 }}>{k}</div>
-                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 700 }}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
     </div>
   );
 }
@@ -3604,6 +3801,971 @@ function demoDevices() {
   ];
 }
 
+// ── AI LABORATORIYA PAGE ──────────────────────────────────────────────────
+function AILabPage() {
+  const [tab, setTab] = useState('performance');
+  const [perfData, setPerfData] = useState(null);
+  const [perfLoading, setPerfLoading] = useState(false);
+  const [attrData, setAttrData] = useState(null);
+  const [attrLoading, setAttrLoading] = useState(false);
+  const [attrIP, setAttrIP] = useState('192.168.1.201');
+  const [attrThreat, setAttrThreat] = useState('brute_force');
+  const [attrCtx, setAttrCtx] = useState('');
+  const [aeData, setAeData] = useState(null);
+  const [aeLoading, setAeLoading] = useState(false);
+  const [aeIP, setAeIP] = useState('192.168.1.201');
+  const [clusterData, setClusterData] = useState(null);
+  const [clusterLoading, setClusterLoading] = useState(false);
+  const [datasets, setDatasets] = useState([]);
+  const [uploadMsg, setUploadMsg] = useState('');
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadName, setUploadName] = useState('');
+  const [uploadFormat, setUploadFormat] = useState('custom');
+
+  const accent = themeAccent('cyan', '#00e5ff');
+
+  useEffect(() => {
+    if (tab === 'performance' && !perfData) loadPerf();
+    if (tab === 'clustering' && !clusterData) loadCluster();
+    if (tab === 'dataset') api.getDatasets().then(setDatasets).catch(() => {});
+  }, [tab]);
+
+  const loadPerf = async () => {
+    setPerfLoading(true);
+    try { setPerfData(await api.getModelPerformance()); } catch { }
+    setPerfLoading(false);
+  };
+
+  const loadCluster = async () => {
+    setClusterLoading(true);
+    try { setClusterData(await api.getCluster()); } catch { }
+    setClusterLoading(false);
+  };
+
+  const loadAttr = async () => {
+    setAttrLoading(true);
+    try {
+      const d = await api.getFeatureAttribution({ ip_address: attrIP, threat_type: attrThreat, context: attrCtx });
+      setAttrData(d);
+    } catch (e) { setAttrData({ error: e.message }); }
+    setAttrLoading(false);
+  };
+
+  const loadAe = async () => {
+    setAeLoading(true);
+    try {
+      const d = await api.getAutoencoderScore({ ip_address: aeIP, context: '' });
+      setAeData(d);
+    } catch (e) { setAeData({ error: e.message }); }
+    setAeLoading(false);
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) { setUploadMsg('Fayl tanlanmagan'); return; }
+    setUploadLoading(true);
+    setUploadMsg('');
+    try {
+      const fd = new FormData();
+      fd.append('file', uploadFile);
+      fd.append('name', uploadName || uploadFile.name);
+      fd.append('format_type', uploadFormat);
+      const res = await api.uploadDataset(fd);
+      setUploadMsg(res.message || 'Yuklandi');
+      api.getDatasets().then(setDatasets).catch(() => {});
+    } catch (e) { setUploadMsg('Xato: ' + e.message); }
+    setUploadLoading(false);
+  };
+
+  const tabs = [
+    { id: 'performance', label: 'Model Samaradorligi' },
+    { id: 'shap', label: 'Feature Attribution (SHAP)' },
+    { id: 'autoencoder', label: 'Autoencoder / Zero-Day' },
+    { id: 'clustering', label: 'Klasterlash' },
+    { id: 'dataset', label: 'Dataset Yuklash' },
+  ];
+
+  const algoColors = { 'Random Forest': '#39ff14', 'XGBoost': '#00e5ff', 'Naive Bayes': '#ffab00', 'SVM': '#a855f7' };
+  const severityColors = { ddos: '#ff1744', sqli: '#ff4500', brute_force: '#ff8c00', phishing: '#ffd700', ransomware: '#ff1744', mitm: '#00bcd4', zero_day: '#e040fb', apt: '#ff1744', port_scan: '#64b5f6' };
+  const bar = (val, max = 100, color = accent) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 10, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(val / max * 100, 100)}%`, background: color, transition: 'width .5s' }}/>
+      </div>
+      <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color, minWidth: 40 }}>{val}%</span>
+    </div>
+  );
+
+  return (
+    <div style={{ animation: 'fadeUp .3s ease' }}>
+      <div className="filter-bar" style={{ marginBottom: 16 }}>
+        {tabs.map(t => (
+          <button key={t.id} className={`filter-btn${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* ── 1. MODEL SAMARADORLIGI ── */}
+      {tab === 'performance' && (
+        <div>
+          {perfLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>}
+          {perfData && !perfData.error && (
+            <>
+              <Panel title="ALGORITMLAR — ANIQLIK METRIKALAR" color={accent}>
+                <div className="panel-body" style={{ overflowX: 'auto' }}>
+                  <table className="alerts-table">
+                    <thead>
+                      <tr><th>ALGORITM</th><th>ACCURACY</th><th>PRECISION</th><th>RECALL</th><th>F1-SCORE</th><th>VIZUAL</th></tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(perfData.algorithms || {}).map(([name, m]) => (
+                        <tr key={name}>
+                          <td style={{ color: algoColors[name] || accent, fontWeight: 700 }}>{name}</td>
+                          <td className="td-mono">{m.accuracy}%</td>
+                          <td className="td-mono">{m.precision}%</td>
+                          <td className="td-mono">{m.recall}%</td>
+                          <td className="td-mono" style={{ color: m.f1 >= 90 ? '#39ff14' : m.f1 >= 70 ? '#ffab00' : '#ff1744', fontWeight: 700 }}>{m.f1}%</td>
+                          <td style={{ minWidth: 160 }}>{bar(m.f1, 100, algoColors[name] || accent)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+                <Panel title="CONFUSION MATRIX (Random Forest)" color="#a855f7">
+                  <div className="panel-body" style={{ overflowX: 'auto', paddingTop: 8, paddingBottom: 8 }}>
+                    <table style={{ borderCollapse: 'collapse', fontSize: 10, fontFamily: 'Share Tech Mono' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '4px 6px', color: '#4a6a84' }}>↓pred / actual→</th>
+                          {(perfData.confusion_matrix?.labels || []).map(l => (
+                            <th key={l} style={{ padding: '4px 6px', color: '#a855f7', writingMode: 'vertical-lr', transform: 'rotate(180deg)', height: 70 }}>{l.toUpperCase()}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(perfData.confusion_matrix?.matrix || []).map((row, ri) => {
+                          const rowMax = Math.max(...row, 1);
+                          return (
+                            <tr key={ri}>
+                              <td style={{ padding: '3px 6px', color: '#a855f7', fontSize: 9 }}>
+                                {(perfData.confusion_matrix?.labels?.[ri] || '').toUpperCase()}
+                              </td>
+                              {row.map((val, ci) => (
+                                <td key={ci} style={{
+                                  padding: '3px 5px', textAlign: 'center', fontSize: 10,
+                                  background: ri === ci
+                                    ? `rgba(57,255,20,${val / rowMax * 0.6 + 0.1})`
+                                    : val > 0 ? `rgba(255,23,68,${val / rowMax * 0.5 + 0.1})` : 'transparent',
+                                  color: ri === ci ? '#39ff14' : val > 0 ? '#ff1744' : '#4a6a84',
+                                  border: '1px solid rgba(74,106,132,.2)',
+                                }}>{val}</td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Panel>
+
+                <Panel title="TAHDID TURLARINI ANIQLASH (F1-Score %)" color="#39ff14">
+                  <div className="panel-body" style={{ paddingTop: 8, paddingBottom: 8, display: 'grid', gap: 10 }}>
+                    {Object.entries(perfData.per_class_f1 || {}).slice(0, 9).map(([threat, algos]) => (
+                      <div key={threat}>
+                        <div style={{ fontSize: 10, color: severityColors[threat] || '#4a6a84', marginBottom: 4, fontFamily: 'Share Tech Mono', letterSpacing: 1 }}>
+                          {threat.toUpperCase()}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          {Object.entries(algos).map(([algo, f1]) => (
+                            <div key={algo} style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: algoColors[algo] || '#4a6a84' }}>
+                              {algo.split(' ')[0]}: <span style={{ color: f1 >= 90 ? '#39ff14' : f1 >= 70 ? '#ffab00' : '#ff4444' }}>{f1}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              </div>
+            </>
+          )}
+          {(!perfData || perfData.error) && !perfLoading && (
+            <div style={{ textAlign: 'center', padding: 40, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>
+              {perfData?.error || 'Model performance yuklanmadi'}
+              <button className="filter-btn active" style={{ marginTop: 16, display: 'block', margin: '16px auto' }} onClick={loadPerf}>QAYTA YUKLASH</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 2. FEATURE ATTRIBUTION (SHAP-like) ── */}
+      {tab === 'shap' && (
+        <div>
+          <Panel title="FEATURE ATTRIBUTION — QAYSI XUSUSIYAT TAHDIDNI ANIQLADI?" color={accent}>
+            <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, paddingTop: 12, paddingBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>IP MANZIL</div>
+                <input className="form-input" value={attrIP} onChange={e => setAttrIP(e.target.value)} placeholder="192.168.1.1"/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>TAHDID TURI</div>
+                <select className="form-input" value={attrThreat} onChange={e => setAttrThreat(e.target.value)}>
+                  {THREATS_LIST.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>KONTEKST</div>
+                <input className="form-input" value={attrCtx} onChange={e => setAttrCtx(e.target.value)} placeholder="ssh brute force urinish..."/>
+              </div>
+            </div>
+            <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={loadAttr} disabled={attrLoading}>
+              {attrLoading ? 'HISOBLANMOQDA...' : 'ATTRIBUTION HISOBLASH'}
+            </button>
+          </Panel>
+
+          {attrData && !attrData.error && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+              <Panel title="FEATURE CONTRIBUTIONS (PER-PREDICTION)" color={accent}>
+                <div className="panel-body" style={{ paddingTop: 10, paddingBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#4a6a84', marginBottom: 10, fontFamily: 'Share Tech Mono' }}>
+                    Asosiy ehtimollik: <span style={{ color: accent }}>{attrData.baseline_probability}</span>
+                    {' '}({attrData.threat_type?.toUpperCase()})
+                  </div>
+                  {(attrData.feature_contributions || []).slice(0, 10).map(({ feature, value }) => {
+                    const isPos = value >= 0;
+                    const pct = Math.min(Math.abs(value) * 500, 100);
+                    return (
+                      <div key={feature} style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#94b4c8' }}>{feature}</span>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: isPos ? '#39ff14' : '#ff4444' }}>
+                            {isPos ? '+' : ''}{value}
+                          </span>
+                        </div>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: isPos ? '#39ff14' : '#ff4444', opacity: 0.8 }}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+
+              <Panel title="GLOBAL FEATURE IMPORTANCE (Random Forest)" color="#a855f7">
+                <div className="panel-body" style={{ paddingTop: 10, paddingBottom: 10 }}>
+                  {(attrData.global_importance || []).slice(0, 10).map(({ feature, value }) => {
+                    const pct = Math.min(value * 500, 100);
+                    return (
+                      <div key={feature} style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#94b4c8' }}>{feature}</span>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#a855f7' }}>{(value * 100).toFixed(2)}%</span>
+                        </div>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: '#a855f7', opacity: 0.8 }}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+            </div>
+          )}
+          {attrData?.error && <div style={{ color: '#ff4444', padding: 20, fontFamily: 'Share Tech Mono' }}>Xato: {attrData.error}</div>}
+        </div>
+      )}
+
+      {/* ── 3. AUTOENCODER / ZERO-DAY ── */}
+      {tab === 'autoencoder' && (
+        <div>
+          <Panel title="AUTOENCODER ANOMALY DETECTOR — ZERO-DAY ANIQLASH" color="#e040fb">
+            <div className="panel-body" style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8 }}>
+                Autoencoder normal trafik patternlarini o'rganadi. Agar input reconstruction error yuqori bo'lsa — noma'lum (zero-day) xatti-harakat aniqlandi.
+                <br/>Arxitektura: MLPRegressor (20 → 14 → 6 → 14 → 20) — bottleneck.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>IP MANZIL TAHLIL QILING</div>
+                <input className="form-input" value={aeIP} onChange={e => setAeIP(e.target.value)} placeholder="192.168.1.201"/>
+              </div>
+              <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={loadAe} disabled={aeLoading}>
+                {aeLoading ? 'HISOBLANMOQDA...' : 'AUTOENCODER TAHLIL'}
+              </button>
+            </div>
+          </Panel>
+
+          {aeData && !aeData.error && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+              <Panel title="RECONSTRUCTION ERROR & ANOMALY SCORE" color="#e040fb">
+                <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    {[
+                      ['Reconstruction Error', aeData.reconstruction_error, '#ffab00'],
+                      ['Anomaly Score', aeData.anomaly_pct, aeData.is_anomaly ? '#ff1744' : '#39ff14'],
+                    ].map(([lbl, val, col]) => (
+                      <div key={lbl} style={{ padding: 14, border: `1px solid ${col}44`, background: `${col}11` }}>
+                        <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 1, marginBottom: 6 }}>{lbl}</div>
+                        <div style={{ fontSize: 22, color: col, fontFamily: 'Orbitron,monospace' }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{
+                    padding: 16, border: `1px solid ${aeData.is_anomaly ? '#ff174444' : '#39ff1444'}`,
+                    background: aeData.is_anomaly ? 'rgba(255,23,68,.08)' : 'rgba(57,255,20,.06)',
+                    color: aeData.is_anomaly ? '#ff1744' : '#39ff14',
+                    fontFamily: 'Share Tech Mono', fontSize: 13, lineHeight: 1.6,
+                  }}>
+                    {aeData.is_anomaly ? '⚠ ' : '✓ '}{aeData.label}
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel title="TOP RECONSTRUCTION ERRORS (Feature bo'yicha)" color="#ffab00">
+                <div className="panel-body" style={{ paddingTop: 10, paddingBottom: 10 }}>
+                  {(aeData.top_error_features || []).map(({ feature, error }) => {
+                    const pct = Math.min(error * 2000, 100);
+                    return (
+                      <div key={feature} style={{ marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#94b4c8' }}>{feature}</span>
+                          <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#ffab00' }}>{error}</span>
+                        </div>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: '#ffab00', opacity: 0.8 }}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Panel>
+            </div>
+          )}
+          {aeData?.error && <div style={{ color: '#ff4444', padding: 20, fontFamily: 'Share Tech Mono' }}>Xato: {aeData.error}</div>}
+        </div>
+      )}
+
+      {/* ── 4. KLASTERLASH ── */}
+      {tab === 'clustering' && (
+        <div>
+          {clusterLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>}
+          {clusterData && !clusterData.error && (
+            <>
+              <div className="stat-grid" style={{ marginBottom: 14 }}>
+                {[
+                  ['NAMUNALAR', clusterData.n_samples, 'cyan'],
+                  ['K-MEANS KLASTER', clusterData.n_kmeans_clusters, 'green'],
+                  ['DBSCAN KLASTER', clusterData.n_dbscan_clusters, 'amber'],
+                  ['ANOMALIYALAR', clusterData.dbscan_noise_count, 'red'],
+                ].map(([lbl, val, col]) => (
+                  <StatCard key={lbl} label={lbl} value={val} color={col}/>
+                ))}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <Panel title="K-MEANS KLASTERLAR" color={accent}>
+                  <div className="panel-body" style={{ paddingTop: 8, paddingBottom: 8, display: 'grid', gap: 10 }}>
+                    {(clusterData.clusters || []).map((c, i) => (
+                      <div key={i} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.4)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ color: accent, fontFamily: 'Share Tech Mono', fontWeight: 700 }}>Klaster {c.id}</span>
+                          <span style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', fontSize: 11 }}>{c.members} ta</span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {Object.entries(c.threat_types || {}).slice(0, 5).map(([t, cnt]) => (
+                            <span key={t} style={{
+                              fontSize: 10, padding: '2px 8px', border: '1px solid', fontFamily: 'Share Tech Mono',
+                              borderColor: (severityColors[t] || '#4a6a84') + '66',
+                              color: severityColors[t] || '#4a6a84',
+                              background: (severityColors[t] || '#4a6a84') + '11',
+                            }}>{t}: {cnt}</span>
+                          ))}
+                        </div>
+                        {c.anomaly_count > 0 && (
+                          <div style={{ marginTop: 6, fontSize: 10, color: '#ff4444', fontFamily: 'Share Tech Mono' }}>
+                            DBSCAN anomaliya: {c.anomaly_count} ta
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+
+                <Panel title="KLASTER NUQTALAR (Scatter — 100 ta namuna)" color="#a855f7">
+                  <div className="panel-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                    <svg viewBox="0 0 300 220" style={{ width: '100%', background: 'rgba(8,17,30,.6)', borderRadius: 4 }}>
+                      {(clusterData.points || []).slice(0, 80).map((p, i) => {
+                        const cx = 20 + p.x * 260;
+                        const cy = 200 - p.y * 180;
+                        const clusterColors = ['#39ff14', '#00e5ff', '#ff1744', '#ffab00', '#a855f7', '#f97316', '#06b6d4', '#84cc16', '#ec4899'];
+                        const col = p.dbscan === -1 ? '#ff1744' : clusterColors[p.kmeans % clusterColors.length];
+                        return <circle key={i} cx={cx} cy={cy} r={p.dbscan === -1 ? 5 : 3} fill={col} opacity={0.7}/>;
+                      })}
+                    </svg>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {['#39ff14', '#00e5ff', '#ffab00', '#a855f7'].map((col, i) => (
+                        <span key={i} style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: '#4a6a84' }}>
+                          <span style={{ color: col }}>●</span> Klaster {i}
+                        </span>
+                      ))}
+                      <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: '#ff4444' }}>● DBSCAN Noise</span>
+                    </div>
+                  </div>
+                </Panel>
+              </div>
+            </>
+          )}
+          {(!clusterData || clusterData.error) && !clusterLoading && (
+            <div style={{ textAlign: 'center', padding: 40, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>
+              <button className="filter-btn active" onClick={loadCluster}>KLASTERLASHNI BOSHLASH</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 5. DATASET YUKLASH ── */}
+      {tab === 'dataset' && (
+        <div>
+          <Panel title="HAQIQIY DATASET YUKLASH (NSL-KDD / CICIDS2017 / Custom CSV)" color="#ffab00">
+            <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 16 }}>
+                CSV formatdagi dataset yuklang. Faylda <code style={{ color: '#ffab00' }}>label</code> yoki <code style={{ color: '#ffab00' }}>class</code> ustuni bo'lishi kerak.
+                NSL-KDD: 41 feature | CICIDS2017: 80+ feature | UNSW-NB15: 49 feature
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>DATASET NOMI</div>
+                  <input className="form-input" value={uploadName} onChange={e => setUploadName(e.target.value)} placeholder="NSL-KDD 2024"/>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>FORMAT</div>
+                  <select className="form-input" value={uploadFormat} onChange={e => setUploadFormat(e.target.value)}>
+                    <option value="nsl_kdd">NSL-KDD</option>
+                    <option value="cicids2017">CICIDS2017</option>
+                    <option value="unsw_nb15">UNSW-NB15</option>
+                    <option value="custom">Custom CSV</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>CSV FAYL</div>
+                  <input type="file" accept=".csv" className="form-input" style={{ padding: '4px 8px' }}
+                    onChange={e => setUploadFile(e.target.files?.[0] || null)}/>
+                </div>
+              </div>
+              <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={handleUpload} disabled={uploadLoading}>
+                {uploadLoading ? 'YUKLANMOQDA...' : 'DATASET YUKLASH'}
+              </button>
+              {uploadMsg && (
+                <div style={{ marginTop: 12, padding: 12, background: uploadMsg.startsWith('Xato') ? 'rgba(255,23,68,.1)' : 'rgba(57,255,20,.1)', color: uploadMsg.startsWith('Xato') ? '#ff4444' : '#39ff14', fontFamily: 'Share Tech Mono', fontSize: 12 }}>
+                  {uploadMsg}
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {datasets.length > 0 && (
+            <Panel title="YUKLANGAN DATASETLAR" color="#ffab00" style={{ marginTop: 14 }}>
+              <div className="panel-body" style={{ overflowX: 'auto' }}>
+                <table className="alerts-table">
+                  <thead>
+                    <tr><th>NOMI</th><th>FORMAT</th><th>YOZUVLAR</th><th>XUSUSIYATLAR</th><th>SINFLAR</th><th>SANA</th></tr>
+                  </thead>
+                  <tbody>
+                    {datasets.map(d => (
+                      <tr key={d.id}>
+                        <td style={{ fontWeight: 600, color: '#ffab00' }}>{d.name}</td>
+                        <td className="td-mono">{d.format_type}</td>
+                        <td className="td-mono">{d.row_count.toLocaleString()}</td>
+                        <td className="td-mono">{d.feature_count}</td>
+                        <td style={{ fontSize: 11, color: '#4a6a84' }}>{(d.classes || []).slice(0, 4).join(', ')}</td>
+                        <td className="td-mono" style={{ fontSize: 10, color: '#4a6a84' }}>{new Date(d.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── VISUALIZATION PAGE ─────────────────────────────────────────────────────
+function VisualizationPage() {
+  const [tab, setTab] = useState('timeline');
+  const [timelineData, setTimelineData] = useState(null);
+  const [heatmapData, setHeatmapData] = useState(null);
+  const [days, setDays] = useState(7);
+  const [loading, setLoading] = useState(false);
+  const accent = themeAccent('cyan', '#00e5ff');
+
+  useEffect(() => {
+    if (tab === 'timeline') loadTimeline();
+    if (tab === 'heatmap' && !heatmapData) loadHeatmap();
+  }, [tab, days]);
+
+  const loadTimeline = async () => {
+    setLoading(true);
+    try { setTimelineData(await api.getThreatTimeline(days)); } catch { }
+    setLoading(false);
+  };
+
+  const loadHeatmap = async () => {
+    setLoading(true);
+    try { setHeatmapData(await api.getHeatmap()); } catch { }
+    setLoading(false);
+  };
+
+  const threatColors = {
+    ddos: '#ff1744', sqli: '#ff4500', brute_force: '#ff8c00', phishing: '#ffd700',
+    ransomware: '#e040fb', mitm: '#00bcd4', zero_day: '#f97316', apt: '#a855f7', port_scan: '#64b5f6',
+  };
+
+  return (
+    <div style={{ animation: 'fadeUp .3s ease' }}>
+      <div className="filter-bar" style={{ marginBottom: 16 }}>
+        <button className={`filter-btn${tab === 'timeline' ? ' active' : ''}`} onClick={() => setTab('timeline')}>Hujum Vaqt Chizig'i</button>
+        <button className={`filter-btn${tab === 'heatmap' ? ' active' : ''}`} onClick={() => setTab('heatmap')}>Tahdid Issiqlik Xaritasi</button>
+      </div>
+
+      {/* ── TIMELINE ── */}
+      {tab === 'timeline' && (
+        <div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+            {[3, 7, 14, 30].map(d => (
+              <button key={d} className={`filter-btn${days === d ? ' active' : ''}`} onClick={() => setDays(d)}>{d} kun</button>
+            ))}
+            {loading && <div className="spinner" style={{ width: 18, height: 18 }}/>}
+          </div>
+
+          {timelineData && (
+            <>
+              <Panel title={`HUJUM VAQT CHIZIG'I — ${days} KUNLIK TREND`} color={accent}>
+                <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                  {/* Simple SVG line chart */}
+                  {(() => {
+                    const data = timelineData.timeline || [];
+                    if (!data.length) return <div style={{ color: '#4a6a84', textAlign: 'center', padding: 20 }}>Ma'lumot yo'q</div>;
+                    const W = 800, H = 180, PAD = 40;
+                    const maxVal = Math.max(1, ...data.map(d => d.total));
+                    const xStep = (W - PAD * 2) / Math.max(data.length - 1, 1);
+                    const yScale = (val) => H - PAD - (val / maxVal) * (H - PAD * 2);
+
+                    const makePath = (key) => {
+                      const pts = data.map((d, i) => `${PAD + i * xStep},${yScale(d[key] || 0)}`);
+                      return `M ${pts.join(' L ')}`;
+                    };
+
+                    const threats = ['ddos', 'sqli', 'brute_force', 'phishing', 'ransomware', 'mitm', 'zero_day', 'apt', 'port_scan'];
+                    return (
+                      <div style={{ overflowX: 'auto' }}>
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: 500 }}>
+                          {[0, 0.25, 0.5, 0.75, 1].map(pct => (
+                            <g key={pct}>
+                              <line x1={PAD} y1={yScale(maxVal * pct)} x2={W - PAD} y2={yScale(maxVal * pct)}
+                                stroke="rgba(74,106,132,.2)" strokeWidth="1"/>
+                              <text x={PAD - 4} y={yScale(maxVal * pct) + 4} textAnchor="end"
+                                fontSize="9" fill="#4a6a84" fontFamily="Share Tech Mono">{Math.round(maxVal * pct)}</text>
+                            </g>
+                          ))}
+                          <path d={makePath('total')} fill="none" stroke={accent} strokeWidth="2" opacity="0.4"/>
+                          {threats.map(t => (
+                            <path key={t} d={makePath(t)} fill="none" stroke={threatColors[t]} strokeWidth="1.5" opacity="0.75"/>
+                          ))}
+                          {data.filter((_, i) => i % Math.max(1, Math.floor(data.length / 8)) === 0).map((d, i, arr) => {
+                            const origIdx = data.indexOf(d);
+                            return (
+                              <text key={i} x={PAD + origIdx * xStep} y={H - 4} textAnchor="middle"
+                                fontSize="8" fill="#4a6a84" fontFamily="Share Tech Mono">{d.label}</text>
+                            );
+                          })}
+                        </svg>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 10 }}>
+                          {threats.map(t => (
+                            <span key={t} style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: threatColors[t] }}>
+                              ─ {t.toUpperCase()}
+                            </span>
+                          ))}
+                          <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: accent, opacity: 0.6 }}>── TOTAL</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </Panel>
+
+              <Panel title="TAHDID TURLARINING UMUMIY TAQSIMOTI" color="#a855f7" style={{ marginTop: 14 }}>
+                <div className="panel-body" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, paddingTop: 10, paddingBottom: 10 }}>
+                  {Object.entries(timelineData.threat_totals || {}).map(([threat, count]) => (
+                    <div key={threat} style={{
+                      padding: '10px 16px', border: `1px solid ${(threatColors[threat] || '#4a6a84')}44`,
+                      background: `${(threatColors[threat] || '#4a6a84')}11`, borderRadius: 4,
+                    }}>
+                      <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 1 }}>{threat.toUpperCase()}</div>
+                      <div style={{ fontSize: 22, fontFamily: 'Orbitron,monospace', color: threatColors[threat] || '#4a6a84', marginTop: 4 }}>{count}</div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── HEATMAP ── */}
+      {tab === 'heatmap' && (
+        <div>
+          {loading && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>}
+          {heatmapData && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <Panel title="PORT BO'YICHA HUJUM TAQSIMOTI" color={accent}>
+                <div className="panel-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                  {Object.entries(heatmapData.all_ports || {})
+                    .filter(([, v]) => v.count > 0 || v.label)
+                    .sort(([, a], [, b]) => b.count - a.count)
+                    .slice(0, 15)
+                    .map(([port, info]) => {
+                      const maxCount = Math.max(1, ...Object.values(heatmapData.all_ports || {}).map(v => v.count));
+                      const pct = (info.count / maxCount) * 100;
+                      const htPct = info.count > 0 ? (info.high_threat / info.count) * 100 : 0;
+                      return (
+                        <div key={port} style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, fontFamily: 'Share Tech Mono', color: '#94b4c8' }}>
+                              :{port} <span style={{ color: '#4a6a84' }}>{info.label}</span>
+                            </span>
+                            <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: htPct > 50 ? '#ff4444' : accent }}>
+                              {info.count} scan | {Math.round(htPct)}% yuksak xavf
+                            </span>
+                          </div>
+                          <div style={{ height: 10, background: 'rgba(255,255,255,.07)', borderRadius: 2, overflow: 'hidden', display: 'flex' }}>
+                            <div style={{ height: '100%', width: `${pct * (1 - htPct / 100)}%`, background: accent, opacity: 0.5 }}/>
+                            <div style={{ height: '100%', width: `${pct * htPct / 100}%`, background: '#ff1744', opacity: 0.8 }}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </Panel>
+
+              <Panel title="SUBNET BO'YICHA TAHDID ZICHLIGI" color="#ff1744">
+                {Object.keys(heatmapData.subnets || {}).length === 0 ? (
+                  <div style={{ color: '#4a6a84', padding: 20, fontFamily: 'Share Tech Mono', textAlign: 'center' }}>
+                    Tahdid loglari yo'q — IP tahlil sahifasidan ba'zi tahlillar qiling
+                  </div>
+                ) : (
+                  <div className="panel-body" style={{ overflowX: 'auto', paddingTop: 8, paddingBottom: 8 }}>
+                    <table className="alerts-table">
+                      <thead>
+                        <tr><th>SUBNET</th><th>JAMI</th><th>KRITIK</th><th>YUQORI</th><th>O'RTA</th></tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(heatmapData.subnets || {}).sort(([, a], [, b]) => b.count - a.count).map(([subnet, info]) => (
+                          <tr key={subnet}>
+                            <td className="td-mono" style={{ color: '#00e5ff' }}>{subnet}</td>
+                            <td className="td-mono">{info.count}</td>
+                            <td className="td-mono" style={{ color: '#ff1744' }}>{info.critical}</td>
+                            <td className="td-mono" style={{ color: '#ff8c00' }}>{info.high}</td>
+                            <td className="td-mono" style={{ color: '#ffab00' }}>{info.medium}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Panel>
+            </div>
+          )}
+          {!heatmapData && !loading && (
+            <div style={{ textAlign: 'center', padding: 40, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>
+              <button className="filter-btn active" onClick={loadHeatmap}>HEATMAP YUKLASH</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MITRE ATT&CK PAGE ─────────────────────────────────────────────────────
+function MitrePage() {
+  const [data, setData] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const accent = themeAccent('cyan', '#00e5ff');
+
+  useEffect(() => {
+    api.getMitreList().then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const tacticColors = {
+    'Initial Access': '#ff8c00', 'Execution': '#e040fb', 'Credential Access': '#ff1744',
+    'Discovery': '#64b5f6', 'Lateral Movement': '#a855f7', 'Collection': '#00bcd4',
+    'Impact': '#ff1744', 'Exfiltration': '#f97316',
+  };
+
+  const killChainColors = ['#4a6a84', '#ffab00', '#ff8f00', '#e65100', '#c62828', '#b71c1c', '#ff1744'];
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="spinner"/></div>;
+
+  const mappings = data?.mappings || [];
+  const phases = data?.kill_chain_phases || [];
+
+  return (
+    <div style={{ animation: 'fadeUp .3s ease' }}>
+      {/* Kill Chain visualization */}
+      <Panel title="LOCKHEED MARTIN CYBER KILL CHAIN" color={accent} style={{ marginBottom: 14 }}>
+        <div className="panel-body" style={{ paddingTop: 14, paddingBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, overflowX: 'auto' }}>
+            {phases.map((phase, i) => {
+              const activeThreats = mappings.filter(m => m.kill_chain_index === i);
+              return (
+                <div key={phase.name} style={{ flex: 1, minWidth: 110, position: 'relative' }}>
+                  <div style={{
+                    padding: '14px 10px', textAlign: 'center',
+                    background: `${killChainColors[i]}22`,
+                    border: `1px solid ${killChainColors[i]}44`,
+                    borderRight: i < phases.length - 1 ? 'none' : `1px solid ${killChainColors[i]}44`,
+                    minHeight: 80,
+                  }}>
+                    <div style={{ fontSize: 9, color: '#4a6a84', letterSpacing: 1, marginBottom: 4 }}>{i + 1}</div>
+                    <div style={{ fontSize: 11, color: killChainColors[i], fontFamily: 'Share Tech Mono', fontWeight: 700, marginBottom: 6 }}>
+                      {phase.label}
+                    </div>
+                    <div style={{ fontSize: 9, color: '#4a6a84' }}>{phase.name}</div>
+                    {activeThreats.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
+                        {activeThreats.map(t => (
+                          <span key={t.threat_type} onClick={() => setSelected(t)} style={{
+                            fontSize: 8, padding: '2px 5px', borderRadius: 2,
+                            background: `${killChainColors[i]}33`, color: killChainColors[i],
+                            border: `1px solid ${killChainColors[i]}66`, cursor: 'pointer',
+                            fontFamily: 'Share Tech Mono',
+                          }}>{t.threat_type.toUpperCase()}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {i < phases.length - 1 && (
+                    <div style={{
+                      position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
+                      width: 0, height: 0, zIndex: 1,
+                      borderTop: '6px solid transparent', borderBottom: '6px solid transparent',
+                      borderLeft: `8px solid ${killChainColors[i]}66`,
+                    }}/>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Panel>
+
+      {/* MITRE Table */}
+      <Panel title="MITRE ATT&CK TEXNIKALAR JADVALI" color="#a855f7">
+        <div className="panel-body" style={{ overflowX: 'auto' }}>
+          <table className="alerts-table">
+            <thead>
+              <tr><th>TAHDID</th><th>TEXNIKA ID</th><th>TEXNIKA</th><th>TAKTIKA</th><th>KILL CHAIN</th><th>AHAMIYAT</th></tr>
+            </thead>
+            <tbody>
+              {mappings.map(m => (
+                <tr key={m.threat_type} onClick={() => setSelected(selected?.threat_type === m.threat_type ? null : m)}
+                  style={{ cursor: 'pointer', background: selected?.threat_type === m.threat_type ? 'rgba(0,229,255,.06)' : undefined }}>
+                  <td style={{ fontWeight: 700, color: accent }}>{m.threat_name}</td>
+                  <td className="td-mono" style={{ color: '#a855f7' }}>{m.technique_id}</td>
+                  <td style={{ fontSize: 12, color: '#94b4c8' }}>{m.technique}</td>
+                  <td>
+                    <span style={{
+                      fontSize: 10, padding: '2px 8px', border: '1px solid',
+                      borderColor: `${tacticColors[m.tactic] || '#4a6a84'}66`,
+                      color: tacticColors[m.tactic] || '#4a6a84',
+                      background: `${tacticColors[m.tactic] || '#4a6a84'}11`,
+                      fontFamily: 'Share Tech Mono',
+                    }}>{m.tactic}</span>
+                  </td>
+                  <td style={{ color: killChainColors[m.kill_chain_index] || '#4a6a84', fontSize: 11, fontFamily: 'Share Tech Mono' }}>
+                    {phases[m.kill_chain_index]?.label || m.kill_chain_phase}
+                  </td>
+                  <td><Badge sev={m.severity}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      {selected && (
+        <Panel title={`TEXNIKA TAFSILOTI — ${selected.technique_id}`} color={accent} style={{ marginTop: 14 }}>
+          <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingTop: 12, paddingBottom: 12 }}>
+            {[
+              ['Tahdid turi', selected.threat_name, accent],
+              ['Texnika ID', selected.technique_id, '#a855f7'],
+              ['Taktika', selected.tactic, tacticColors[selected.tactic] || '#4a6a84'],
+              ['Kill Chain bosqichi', phases[selected.kill_chain_index]?.label || selected.kill_chain_phase, killChainColors[selected.kill_chain_index]],
+            ].map(([lbl, val, col]) => (
+              <div key={lbl} style={{ padding: 14, border: `1px solid ${col}44` }}>
+                <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 1, marginBottom: 4 }}>{lbl}</div>
+                <div style={{ color: col, fontFamily: 'Share Tech Mono', fontSize: 14 }}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12, color: '#94b4c8', fontSize: 13, lineHeight: 1.8 }}>
+            {selected.description}
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+// ── REPORTS PAGE ───────────────────────────────────────────────────────────
+function ReportsPage() {
+  const [incidents, setIncidents] = useState([]);
+  const [incLoading, setIncLoading] = useState(false);
+  const [correlating, setCorrelating] = useState(false);
+  const [corrMsg, setCorrMsg] = useState('');
+  const accent = themeAccent('cyan', '#00e5ff');
+
+  useEffect(() => { loadIncidents(); }, []);
+
+  const loadIncidents = async () => {
+    setIncLoading(true);
+    try {
+      const d = await api.getIncidents();
+      setIncidents(d.incidents || []);
+    } catch { }
+    setIncLoading(false);
+  };
+
+  const runCorr = async () => {
+    setCorrelating(true);
+    setCorrMsg('');
+    try {
+      const d = await api.runCorrelation();
+      const n = (d.new_incidents || []).length;
+      setCorrMsg(n > 0 ? `${n} ta yangi intsident aniqlandi!` : "Yangi intsidentlar topilmadi (yetarli tahdid log yo'q)");
+      setIncidents(d.all_incidents || []);
+    } catch (e) { setCorrMsg('Xato: ' + e.message); }
+    setCorrelating(false);
+  };
+
+  const sev = s => ({ critical: '#ff1744', high: '#ff8c00', medium: '#ffab00', low: '#39ff14' }[s] || '#4a6a84');
+
+  return (
+    <div style={{ animation: 'fadeUp .3s ease' }}>
+      {/* Export cards */}
+      <Panel title="MA'LUMOTLARNI EKSPORT QILISH" color={accent} style={{ marginBottom: 14 }}>
+        <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, paddingTop: 14, paddingBottom: 14 }}>
+          {[
+            { title: 'CSV EKSPORT', desc: 'Excel va data analysis uchun', color: '#39ff14', url: api.getExportCsvUrl(), fileName: 'cyberguard_threats.csv' },
+            { title: 'JSON EKSPORT', desc: 'API va dasturlash uchun', color: '#00e5ff', url: api.getExportJsonUrl(), fileName: 'cyberguard_threats.json' },
+            { title: 'PDF HISOBOT', desc: 'Professional taqdimot uchun', color: '#ff4444', url: api.getExportPdfUrl(), fileName: 'cyberguard_report.pdf' },
+          ].map(({ title, desc, color, url, fileName }) => (
+            <div key={title} style={{
+              padding: 20, border: `1px solid ${color}44`, background: `${color}08`,
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <div style={{ fontSize: 14, color, fontFamily: 'Share Tech Mono', fontWeight: 700 }}>{title}</div>
+              <div style={{ fontSize: 12, color: '#4a6a84', flex: 1 }}>{desc}</div>
+              <a
+                href={url}
+                download={fileName}
+                style={{
+                  display: 'inline-block', padding: '8px 16px', background: `${color}22`,
+                  border: `1px solid ${color}66`, color, fontFamily: 'Share Tech Mono',
+                  fontSize: 12, textDecoration: 'none', textAlign: 'center', cursor: 'pointer',
+                }}
+                onClick={e => {
+                  e.preventDefault();
+                  const apiKey = localStorage.getItem('cg_api_key') || 'cyberguard-demo-key';
+                  fetch(url, { headers: { 'X-API-Key': apiKey } })
+                    .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+                    .then(blob => {
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = fileName;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    })
+                    .catch(() => {});
+                }}
+              >YUKLAB OLISH</a>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      {/* Incidents / Correlation */}
+      <Panel title="TAHDID KORRELYATSIYASI — INTSIDENTLAR" color="#ff4444">
+        <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+          <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 14 }}>
+            Korrelyatsiya dvigatel mavjud tahdid loglarini tahlil qilib, bir nechta hodisani birlashtirib "Intsident" sifatida qayd etadi.
+            Masalan: Brute Force + Port Scan → APT hujumi ehtimoli.
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+            <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={runCorr} disabled={correlating}>
+              {correlating ? 'TAHLIL QILINMOQDA...' : 'KORRELYATSIYA DVIGATELNI ISHLATISH'}
+            </button>
+            <button className="filter-btn" onClick={loadIncidents}>YANGILASH</button>
+            {corrMsg && (
+              <span style={{
+                fontFamily: 'Share Tech Mono', fontSize: 12,
+                color: corrMsg.includes('yangi') && !corrMsg.includes("yo'q") ? '#39ff14' : '#ffab00',
+              }}>{corrMsg}</span>
+            )}
+          </div>
+
+          {incLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><div className="spinner"/></div>
+          ) : incidents.length === 0 ? (
+            <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', textAlign: 'center', padding: 20 }}>
+              Hozircha intsident yo'q. Korrelyatsiya dvigatelni ishlatib ko'ring.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {incidents.map(inc => (
+                <div key={inc.id} style={{
+                  padding: 16, border: `1px solid ${sev(inc.severity)}44`,
+                  background: `${sev(inc.severity)}08`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <span style={{ color: sev(inc.severity), fontFamily: 'Share Tech Mono', fontWeight: 700, fontSize: 14 }}>{inc.title}</span>
+                      <span style={{ marginLeft: 10, fontSize: 10, color: '#4a6a84' }}>#{inc.id}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <Badge sev={inc.severity}/>
+                      <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: '#4a6a84' }}>
+                        {new Date(inc.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#94b4c8', marginBottom: 8 }}>{inc.description}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: '#4a6a84' }}>
+                      Aloqador IP lar:
+                    </span>
+                    {(inc.involved_ips || []).slice(0, 6).map(ip => (
+                      <span key={ip} style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: '#00e5ff', padding: '1px 6px', border: '1px solid #00e5ff33', background: '#00e5ff11' }}>{ip}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+
 // ── ROOT APP ───────────────────────────────────────────────────────────────
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(() => safeStorageGet('cg_auth', '') === '1');
@@ -3690,6 +4852,10 @@ export default function App() {
           {page === 'logs'      && <LogsPage/>}
           {page === 'insights'  && <InsightsPage initialTab="threats"/>}
           {page === 'settings'  && <SettingsPage/>}
+          {page === 'ai_lab'    && <AILabPage/>}
+          {page === 'visualization' && <VisualizationPage/>}
+          {page === 'mitre'     && <MitrePage/>}
+          {page === 'reports'   && <ReportsPage/>}
         </div>
         <div className="ticker-wrap">
           <div className="ticker-inner">
@@ -3702,7 +4868,6 @@ export default function App() {
     </div>
   );
 }
-
 
 
 
