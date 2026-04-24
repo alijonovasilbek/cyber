@@ -15,7 +15,6 @@ urlpatterns = [
     path('dashboard/', views.dashboard_stats),
     path('analyze/', views.analyze_ip),
     path('scan-ip/', views.safe_scan_ip),
-    path('simulate-traffic/', views.simulate_traffic_view),
     path('predict/', views.predict_threat),
     path('intel/', views.target_intel),
     path('network/interfaces/', views.network_interfaces),

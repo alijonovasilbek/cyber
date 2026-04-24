@@ -3,7 +3,6 @@ from textwrap import dedent
 from django.utils import timezone
 
 from django.http import HttpResponse
-from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view
@@ -14,7 +13,6 @@ from .demo_engine import (
     get_cached_reputation,
     predict_next_window,
     scan_ip_safe,
-    simulate_traffic,
 )
 from .models import (
     BlockedIP,
@@ -51,8 +49,6 @@ from .serializers import (
     SafeScanRequestSerializer,
     SafeScanResponseSerializer,
     ScanSessionSerializer,
-    SimulateTrafficRequestSerializer,
-    SimulateTrafficResponseSerializer,
     TargetIntelRequestSerializer,
     ThreatLogSerializer,
     ThreatPredictionRequestSerializer,
@@ -689,56 +685,6 @@ def safe_scan_ip(request):
     payload['analysis_id'] = record.id
     publish_event('scan.completed', payload)
     return Response(payload)
-
-
-@extend_schema(tags=['Simulator'], request=SimulateTrafficRequestSerializer, responses=SimulateTrafficResponseSerializer)
-@api_view(['POST'])
-def simulate_traffic_view(request):
-    guard_error = guard_request(request, 'simulate-traffic')
-    if guard_error:
-        return guard_error
-
-    serializer = SimulateTrafficRequestSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-
-    logs = simulate_traffic(
-        simulation_type=data['simulation_type'],
-        ip=data['ip_address'],
-        port=data.get('port'),
-        samples=data.get('samples', 12),
-    )
-    created_rows = [
-        TrafficEventLog(
-            ip_address=item['ip'],
-            port=item['port'],
-            traffic_type=item['traffic_type'],
-            request_count=item['request_count'],
-            failed_attempts=item['failed_attempts'],
-            packet_size_avg=item['packet_size_avg'],
-            connection_frequency=item['connection_frequency'],
-            source=item['source'],
-            metadata={'timestamp': item['timestamp']},
-            created_at=parse_datetime(item['timestamp']) or timezone.now(),
-        )
-        for item in logs
-    ]
-    TrafficEventLog.objects.bulk_create(created_rows)
-
-    analysis = analyze_traffic(logs)
-    threat_log = _create_behavior_threat_log(data['ip_address'], analysis, logs)
-    blocked = _simulate_block(data['ip_address'], threat_log, analysis) if data.get('auto_response') else False
-    reputation = get_cached_reputation(data['ip_address'])
-
-    publish_event('traffic.simulated', {'logs': logs[:5], 'count': len(logs), 'ip': data['ip_address']})
-    publish_event('threat.detected', {**analysis, 'ip': data['ip_address'], 'blocked': blocked})
-
-    return Response({
-        'logs': logs,
-        'analysis': {**analysis, 'log_id': threat_log.id, 'blocked': blocked},
-        'reputation': reputation,
-        'blocked': blocked,
-    })
 
 
 @extend_schema(tags=['Prediction'], request=ThreatPredictionRequestSerializer, responses=ThreatPredictionResponseSerializer)

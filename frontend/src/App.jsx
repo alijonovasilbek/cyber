@@ -1107,9 +1107,6 @@ function NetworkPage({ onAnalyze }) {
   const [safeScanForm, setSafeScanForm] = useState({ ip: '', ports: '21,22,23,80,443', timeout: 0.35 });
   const [safeScanBusy, setSafeScanBusy] = useState(false);
   const [safeScanResult, setSafeScanResult] = useState(null);
-  const [simForm, setSimForm] = useState({ ip: '', simulation_type: 'normal', samples: 8, auto_response: true });
-  const [simBusy, setSimBusy] = useState(false);
-  const [simResult, setSimResult] = useState(null);
 
     const loadNetworkContext = useCallback(async () => {
       try {
@@ -1185,7 +1182,6 @@ function NetworkPage({ onAnalyze }) {
     setSelected(ip);
     setRepInfo(null);
     setSafeScanForm(form => ({ ...form, ip }));
-    setSimForm(form => ({ ...form, ip }));
     try {
       const d = await api.getReputation(ip);
       setRepInfo(d);
@@ -1296,26 +1292,6 @@ function NetworkPage({ onAnalyze }) {
     }
   };
 
-  const runSimulation = async () => {
-    if (!simForm.ip) return;
-    setSimBusy(true);
-    setProfileError('');
-    try {
-      const response = await api.simulateTraffic({
-        ip_address: simForm.ip,
-        simulation_type: simForm.simulation_type,
-        samples: Number(simForm.samples || 8),
-        auto_response: simForm.auto_response,
-      });
-      setSimResult(response);
-    } catch (err) {
-      setProfileError(err.message || 'Traffic simulation bajarilmadi');
-      setSimResult(null);
-    } finally {
-      setSimBusy(false);
-    }
-  };
-
     useEffect(() => { loadNetworkContext(); }, [loadNetworkContext]);
     useEffect(() => {
       const id = setInterval(async () => {
@@ -1328,7 +1304,6 @@ function NetworkPage({ onAnalyze }) {
     const firstIp = selected || devices[0]?.ip || '';
     if (firstIp) {
       setSafeScanForm(form => form.ip ? form : { ...form, ip: firstIp });
-      setSimForm(form => form.ip ? form : { ...form, ip: firstIp });
     }
   }, [devices, selected]);
 
@@ -1631,7 +1606,7 @@ function NetworkPage({ onAnalyze }) {
         </Panel>
       )}
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:14, marginTop:14 }}>
         <Panel title="SAFE IP COLLECTOR" color={cyan}>
           <div className="panel-body">
             <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr .6fr auto', gap:10, alignItems:'center' }}>
@@ -1672,54 +1647,6 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{ display:'flex', gap:8 }}>
                   <button className="action-btn" onClick={() => onAnalyze(safeScanResult.ip, { threat: 'port_scan', context: `Safe scan open ports: ${(safeScanResult.open_ports || []).join(', ') || 'none'}` })}>
                     ANALYZE SAFE SCAN
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel title="SIMULATED TRAFFIC LAB" color={redTone}>
-          <div className="panel-body">
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr .7fr auto', gap:10, alignItems:'center' }}>
-              <input value={simForm.ip} onChange={e => setSimForm(form => ({ ...form, ip: e.target.value }))} placeholder="Target IP" style={inputStyle}/>
-              <select value={simForm.simulation_type} onChange={e => setSimForm(form => ({ ...form, simulation_type: e.target.value }))} style={inputStyle}>
-                <option value="normal">Normal</option>
-                <option value="ddos">DDoS</option>
-                <option value="brute_force">Brute Force</option>
-              </select>
-              <input value={simForm.samples} onChange={e => setSimForm(form => ({ ...form, samples: e.target.value }))} type="number" min="4" max="24" style={inputStyle}/>
-              <button className="action-btn" onClick={runSimulation} disabled={simBusy || !simForm.ip}>
-                {simBusy ? 'SIM...' : 'SIMULATE'}
-              </button>
-            </div>
-            <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, color:cyanSoft, fontSize:12 }}>
-              <input type="checkbox" checked={simForm.auto_response} onChange={e => setSimForm(form => ({ ...form, auto_response: e.target.checked }))}/>
-              Safe auto-response ni simulyatsiya qilish
-            </label>
-            {simResult && (
-              <div style={{ marginTop:12, display:'grid', gap:10 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10 }}>
-                  {[
-                    ['Threat', simResult.analysis?.threat_level || '-', threatLevelColor(simResult.analysis?.threat_level)],
-                    ['Attack', simResult.analysis?.attack_type || '-', cyan],
-                    ['Confidence', `${simResult.analysis?.confidence || 0}%`, cyanSoft],
-                    ['Blocked', simResult.blocked ? 'YES' : 'NO', simResult.blocked ? '#39ff14' : amberTone],
-                  ].map(([label, value, color]) => (
-                    <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
-                      <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
-                      <div style={{ color, fontFamily:'Orbitron,monospace', fontSize:15 }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:`${redTone}12` }}>
-                  {(simResult.analysis?.signals || []).map(item => (
-                    <div key={item} style={{ color:cyanSoft, fontSize:12, marginBottom:6 }}>{item}</div>
-                  ))}
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button className="action-btn" onClick={() => onAnalyze(simForm.ip, { context: (simResult.analysis?.signals || []).join('\n'), threat: simForm.simulation_type === 'brute_force' ? 'brute_force' : simForm.simulation_type === 'ddos' ? 'ddos' : '' })}>
-                    OPEN IN ANALYZE
                   </button>
                 </div>
               </div>
@@ -3314,7 +3241,6 @@ function TopologyVisualPanel({ guideKey }) {
 
 function TopologyPage() {
   const { events } = useLiveFeed();
-  const [trafficLogs, setTrafficLogs] = useState([]);
   const [interfaces, setInterfaces] = useState([]);
   const [devices, setDevices] = useState([]);
   const [scenarioKey, setScenarioKey] = useState('normal');
@@ -3345,28 +3271,6 @@ function TopologyPage() {
     observer: { border:`${purple}88`, bg:`${purple}14`, color:cyanSoft },
   }[tone]);
   const packetCount = scenarioKey === 'attack' ? 8 : scenarioKey === 'blocked' ? 3 : 5;
-
-  useEffect(() => {
-    let active = true;
-
-    const loadTrafficLogs = async () => {
-      try {
-        const response = await api.getTrafficLogs();
-        if (!active) return;
-        setTrafficLogs(response.results || response || []);
-      } catch {
-        if (!active) return;
-        setTrafficLogs([]);
-      }
-    };
-
-    loadTrafficLogs();
-    const id = setInterval(loadTrafficLogs, 6000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -3571,10 +3475,10 @@ function TopologyPage() {
         </div>
       </Panel>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:14, marginTop:14 }}>
         <Panel title="EVENT BUS" color={cyan}>
           <div className="panel-body" style={{ maxHeight: 260, overflowY:'auto', display:'grid', gap:8 }}>
-            {(events.length ? events : [{ kind:'system', timestamp:new Date().toISOString(), payload:{ message:'Realtime eventlar kutilmoqda' } }]).slice(0, 12).map((event, index) => (
+            {events.slice(0, 12).map((event, index) => (
               <div key={`${event.kind}-${event.timestamp}-${index}`} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:panelGlow }}>
                 <div style={{ display:'flex', justifyContent:'space-between', gap:8, marginBottom:6 }}>
                   <span style={{ color:cyan, fontFamily:'Share Tech Mono', fontSize:11 }}>{String(event.kind || 'event').toUpperCase()}</span>
@@ -3585,24 +3489,7 @@ function TopologyPage() {
                 </div>
               </div>
             ))}
-          </div>
-        </Panel>
-
-        <Panel title="SIMULATED / STORED TRAFFIC LOGS" color="#ffab00">
-          <div className="panel-body" style={{ maxHeight: 260, overflowY:'auto', display:'grid', gap:8 }}>
-            {(trafficLogs || []).slice(0, 12).map(item => (
-              <div key={item.id} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(255,171,0,.05)' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', gap:10, marginBottom:6 }}>
-                  <span style={{ color:'#ffab00', fontFamily:'Share Tech Mono', fontSize:11 }}>{String(item.traffic_type || '-').toUpperCase()}</span>
-                  <span style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', fontSize:10 }}>{fmtTime(item.created_at)}</span>
-                </div>
-                <div style={{ color:cyanSoft, fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>{displayText(item.ip_address)}:{displayText(item.port)}</div>
-                <div style={{ color:cyanSoft, fontSize:12 }}>
-                  req={displayText(item.request_count)} | failed={displayText(item.failed_attempts)} | freq={displayText(item.connection_frequency)}
-                </div>
-              </div>
-            ))}
-            {trafficLogs.length === 0 && <span style={{ color:'#4a6a84' }}>Traffic simulation loglari hali yo&apos;q...</span>}
+            {events.length === 0 && <div style={{ color:'#4a6a84', fontSize:12 }}>Hozircha real event kelmagan.</div>}
           </div>
         </Panel>
       </div>

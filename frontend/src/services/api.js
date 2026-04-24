@@ -204,7 +204,6 @@ export const api = {
   analyzeBehavior: data => post('/analyze/', data),
   getTargetIntel: data => post('/intel/', data),
   safeScan,
-  simulateTraffic: data => post('/simulate-traffic/', data),
   predictThreat: data => post('/predict/', data),
   getInterfaces,
   getWifiStatus,
