@@ -414,6 +414,19 @@ function useClock() {
   return time;
 }
 
+function useViewport(maxWidth = 900) {
+  const getValue = () => (typeof window !== 'undefined' ? window.innerWidth <= maxWidth : false);
+  const [isMobile, setIsMobile] = useState(getValue);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(getValue());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [maxWidth]);
+
+  return isMobile;
+}
+
 function useLiveFeed() {
   const [logs, setLogs] = useState([]);
   const [events, setEvents] = useState([]);
@@ -587,7 +600,7 @@ function LoginPage({ onLogin }) {
 }
 
 // ── SIDEBAR ────────────────────────────────────────────────────────────────
-function Sidebar({ page, setPage, alertCount }) {
+function Sidebar({ page, setPage, alertCount, mobileOpen, onClose, themeMode, onToggleTheme }) {
   const sections = [
     {
       title: 'ASOSIY',
@@ -611,10 +624,15 @@ function Sidebar({ page, setPage, alertCount }) {
     },
   ];
   return (
-    <div className="sidebar">
+    <div className={`sidebar${mobileOpen ? ' open' : ''}`}>
       <div className="sb-logo">
-        <div className="mark">CYBERGUARD</div>
-        <div className="sub">AI SECURITY PLATFORM</div>
+        <div className="sidebar-head-row">
+          <div>
+            <div className="mark">CYBERGUARD</div>
+            <div className="sub">AI SECURITY PLATFORM</div>
+          </div>
+          <button className="sidebar-close" onClick={onClose}>×</button>
+        </div>
         <div className="sb-status">
           <span className="dot"/><span>SHIELDS ACTIVE</span>
         </div>
@@ -632,7 +650,7 @@ function Sidebar({ page, setPage, alertCount }) {
               {section.title}
             </div>
             {section.items.map(n => (
-              <div key={n.id} className={`nav-item${page === n.id ? ' active' : ''}`} onClick={() => setPage(n.id)}>
+              <div key={n.id} className={`nav-item${page === n.id ? ' active' : ''}`} onClick={() => { setPage(n.id); onClose?.(); }}>
                 <span className="ico mono">{n.ico}</span>
                 <span>{n.label}</span>
                 {n.badge > 0 && <span className="nav-badge">{n.badge}</span>}
@@ -642,6 +660,9 @@ function Sidebar({ page, setPage, alertCount }) {
         ))}
       </div>
       <div className="sb-bottom">
+        <button className={`theme-toggle-btn${themeMode === 'hacker' ? ' hacker' : ''}`} onClick={onToggleTheme}>
+          {themeMode === 'hacker' ? 'HACKER MODE: ON' : 'CLASSIC MODE'}
+        </button>
         <div className="user-row">
           <div className="user-avatar">SA</div>
           <div className="user-info">
@@ -655,7 +676,7 @@ function Sidebar({ page, setPage, alertCount }) {
 }
 
 // ── TOPBAR ─────────────────────────────────────────────────────────────────
-function TopBar({ page, time }) {
+function TopBar({ page, time, onMenuToggle, themeMode, onToggleTheme }) {
   const titles = {
     dashboard: 'THREAT DASHBOARD',
     threats: 'TAHDID LOGLARI',
@@ -672,8 +693,12 @@ function TopBar({ page, time }) {
   };
   return (
     <div className="topbar">
+      <button className="mobile-menu-btn" onClick={onMenuToggle}>≡</button>
       <div className="topbar-title">{titles[page] || 'DASHBOARD'}</div>
       <div className="topbar-time mono">{fmtTime(time)} UTC</div>
+      <button className={`topbar-theme-btn${themeMode === 'hacker' ? ' hacker' : ''}`} onClick={onToggleTheme}>
+        {themeMode === 'hacker' ? 'HACKER' : 'CLASSIC'}
+      </button>
       <div className="topbar-pill pill-secure">
         <StatusDot color="#39ff14" size={5}/> SECURE
       </div>
@@ -3627,7 +3652,22 @@ export default function App() {
   const [analyzeContext, setAnalyzeContext] = useState('');
   const [analyzeThreat, setAnalyzeThreat] = useState('');
   const [alertCount, setAlertCount] = useState(0);
+  const [themeMode, setThemeMode] = useState(() => safeStorageGet('cg_theme', 'classic'));
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const time = useClock();
+  const isMobile = useViewport(900);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeMode);
+    document.body.setAttribute('data-theme', themeMode);
+    safeStorageSet('cg_theme', themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileNavOpen(false);
+    }
+  }, [isMobile]);
 
   useEffect(() => {
     if (!loggedIn) return undefined;
@@ -3649,6 +3689,7 @@ export default function App() {
 
   const navTo = p => { setPage(p); safeStorageSet('cg_page', p); };
   const handleLogin = () => { safeStorageSet('cg_auth', '1'); setLoggedIn(true); };
+  const toggleTheme = () => setThemeMode(mode => mode === 'hacker' ? 'classic' : 'hacker');
 
   const handleNetworkAnalyze = (ip, options = {}) => {
     setAnalyzeIP(ip);
@@ -3660,10 +3701,19 @@ export default function App() {
   if (!loggedIn) return <LoginPage onLogin={handleLogin}/>;
 
   return (
-    <div className="app">
-      <Sidebar page={page} setPage={navTo} alertCount={alertCount}/>
+    <div className={`app ${themeMode === 'hacker' ? 'theme-hacker' : 'theme-classic'}`}>
+      {isMobile && mobileNavOpen && <div className="mobile-sidebar-backdrop" onClick={() => setMobileNavOpen(false)}/>}
+      <Sidebar
+        page={page}
+        setPage={navTo}
+        alertCount={alertCount}
+        mobileOpen={!isMobile || mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
+      />
       <div className="main">
-        <TopBar page={page} time={time}/>
+        <TopBar page={page} time={time} onMenuToggle={() => setMobileNavOpen(open => !open)} themeMode={themeMode} onToggleTheme={toggleTheme}/>
         <div className="content">
           {page === 'dashboard' && <DashboardPage/>}
           {page === 'threats'   && <ThreatsPage/>}
