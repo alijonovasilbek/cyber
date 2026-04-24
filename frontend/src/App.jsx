@@ -38,6 +38,26 @@ function displayText(value, fallback = '-') {
   return fallback;
 }
 
+function themeAccent(name, fallback) {
+  if (typeof document === 'undefined') return fallback;
+  const mode = document.documentElement.getAttribute('data-theme') || 'classic';
+  if (mode !== 'hacker') return fallback;
+  const map = {
+    cyan: '#39ff14',
+    cyanSoft: '#8dff84',
+    cyanDim: '#4f8d4f',
+    purple: '#66ff66',
+    purpleSoft: '#9dff9d',
+    amber: '#83ff6d',
+    red: '#5dff4a',
+    redSoft: '#b8ffab',
+    panelGlow: 'rgba(57,255,20,.08)',
+    panelGlowStrong: 'rgba(57,255,20,.14)',
+    panelBorder: 'rgba(57,255,20,.3)',
+  };
+  return map[name] || fallback;
+}
+
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
 const THREATS_LIST = [
   {v:'ddos',l:'DDoS hujumi'},{v:'sqli',l:'SQL Injection'},{v:'brute_force',l:'Brute Force'},
@@ -1341,9 +1361,20 @@ function NetworkPage({ onAnalyze }) {
   const currentScanSourceText = agentMode
     ? "Hozir ko'rinayotgan hostlar local agent orqali aynan shu kompyuterdan olingan."
     : "Hozir ko'rinayotgan hostlar local agentdan emas, backend ishlayotgan muhitdan olingan. Agar backend shu kompyuterda ishlayotgan bo'lsa ular real bo'lishi mumkin; agar backend serverda bo'lsa bu shu kompyuter tarmog'i emas.";
+  const cyan = themeAccent('cyan', '#00e5ff');
+  const cyanSoft = themeAccent('cyanSoft', '#9fe8ff');
+  const cyanDim = themeAccent('cyanDim', '#7ab8d4');
+  const purple = themeAccent('purple', '#8b5cf6');
+  const purpleSoft = themeAccent('purpleSoft', '#d8b4fe');
+  const amberTone = themeAccent('amber', '#ffab00');
+  const redTone = themeAccent('red', '#ff1744');
+  const redSoft = themeAccent('redSoft', '#ff8fa0');
+  const panelGlow = themeAccent('panelGlow', 'rgba(0,229,255,.05)');
+  const panelGlowStrong = themeAccent('panelGlowStrong', 'rgba(0,229,255,.08)');
+  const panelBorder = themeAccent('panelBorder', 'rgba(0,229,255,.22)');
   const inputStyle = {
     width: '100%',
-    background: 'rgba(0,229,255,.04)',
+    background: panelGlow,
     border: '1px solid var(--border)',
     color: 'var(--text)',
     padding: '9px 12px',
@@ -1354,10 +1385,10 @@ function NetworkPage({ onAnalyze }) {
 
   return (
       <div style={{ animation: 'fadeUp .3s ease' }}>
-        <Panel title={`LOCAL TARMOQ SKANERI | ${devices.length} TOPILDI`} color="#00e5ff"
+        <Panel title={`LOCAL TARMOQ SKANERI | ${devices.length} TOPILDI`} color={cyan}
           extra={
             <div style={{ display:'flex', alignItems:'center', gap:10, marginLeft:'auto' }}>
-              <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: agentMode ? '#39ff14' : '#ffab00' }}>
+              <span style={{ fontSize: 10, fontFamily: 'Share Tech Mono', color: agentMode ? '#39ff14' : amberTone }}>
                 {agentMode ? 'LOCAL AGENT: ACTIVE' : 'LOCAL AGENT: OFF'}
               </span>
               {!agentMode && (
@@ -1378,9 +1409,9 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{
                   marginBottom: 12,
                   padding: 12,
-                  border: '1px solid rgba(255,171,0,.35)',
-                  background: 'rgba(255,171,0,.06)',
-                  color: '#ffd37a',
+                  border: `1px solid ${amberTone}55`,
+                  background: `${amberTone}14`,
+                  color: amberTone,
                   fontSize: 12,
                   lineHeight: 1.7,
                 }}>
@@ -1391,9 +1422,9 @@ function NetworkPage({ onAnalyze }) {
               <div style={{
                 marginBottom: 12,
                 padding: 12,
-                border: '1px solid rgba(0,229,255,.22)',
-                background: 'rgba(0,229,255,.05)',
-                color: '#9fe8ff',
+                border: `1px solid ${panelBorder}`,
+                background: panelGlow,
+                color: cyanSoft,
                 fontSize: 12,
                 lineHeight: 1.7,
               }}>
@@ -1403,9 +1434,9 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{
                   marginBottom: 12,
                   padding: 12,
-                  border: '1px solid rgba(255,23,68,.35)',
-                  background: 'rgba(255,23,68,.06)',
-                  color: '#ff8fa0',
+                  border: `1px solid ${redTone}55`,
+                  background: `${redTone}14`,
+                  color: redSoft,
                   fontSize: 12,
                   lineHeight: 1.7,
                 }}>
@@ -1415,8 +1446,8 @@ function NetworkPage({ onAnalyze }) {
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10, marginBottom: 12 }}>
               {[
                 ['Onlayn hostlar', `${deviceStats.online}/${devices.length}`, '#39ff14'],
-                ['Yuqori xavf', `${deviceStats.risky} ta`, '#ffab00'],
-                ['Ko‘p port ochiq', `${deviceStats.exposed} ta`, '#9fc2ea'],
+                ['Yuqori xavf', `${deviceStats.risky} ta`, amberTone],
+                ['Ko‘p port ochiq', `${deviceStats.exposed} ta`, cyanSoft],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ padding: 12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
                   <div style={{ fontSize: 10, color: '#4a6a84', letterSpacing: 2, marginBottom: 6 }}>{label}</div>
@@ -1430,15 +1461,15 @@ function NetworkPage({ onAnalyze }) {
               const isSel = selected === d.ip;
               return (
                 <div key={i} onClick={() => checkRep(d.ip)} style={{
-                  background: isSel ? 'rgba(0,229,255,.06)' : 'linear-gradient(180deg, rgba(13,27,46,.72), rgba(8,15,28,.92))',
+                  background: isSel ? panelGlowStrong : 'linear-gradient(180deg, rgba(13,27,46,.72), rgba(8,15,28,.92))',
                   border: `1px solid ${isSel ? 'var(--cyan)' : `${rc}44`}`,
-                  boxShadow: isSel ? '0 0 18px rgba(0,229,255,.15)' : 'none',
+                  boxShadow: isSel ? `0 0 18px ${panelGlowStrong}` : 'none',
                   padding: 16, cursor: 'pointer', transition: 'all .2s', minHeight: 180,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text)', marginBottom: 4 }}>{d.name}</div>
-                      <div style={{ fontFamily: 'Share Tech Mono', fontSize: 12, color: '#00e5ff' }}>{d.ip}</div>
+                      <div style={{ fontFamily: 'Share Tech Mono', fontSize: 12, color: cyan }}>{d.ip}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                       <StatusDot color={d.status === 'online' ? '#39ff14' : '#4a6a84'} size={8}/>
@@ -1455,13 +1486,13 @@ function NetworkPage({ onAnalyze }) {
                     <span style={{ fontSize: 10, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>{d.network_type}</span>
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom: 12, fontSize: 11 }}>
-                    <div style={{ color:'#7ab8d4', fontFamily:'Share Tech Mono' }}>Portlar: {(d.open_ports || []).join(', ') || '-'}</div>
+                    <div style={{ color:cyanDim, fontFamily:'Share Tech Mono' }}>Portlar: {(d.open_ports || []).join(', ') || '-'}</div>
                     <div style={{ color:'#4a6a84', fontFamily:'Share Tech Mono', textAlign:'right' }}>{d.open_ports?.length || 0} ta ochiq</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button className="action-btn" style={{ flex: 1,
-                      borderColor: (d.risk === 'critical' || d.risk === 'high') ? 'rgba(255,23,68,.5)' : 'var(--border)',
-                      color: (d.risk === 'critical' || d.risk === 'high') ? '#ff1744' : 'var(--text-dim)',
+                      borderColor: (d.risk === 'critical' || d.risk === 'high') ? `${redTone}88` : 'var(--border)',
+                      color: (d.risk === 'critical' || d.risk === 'high') ? redTone : 'var(--text-dim)',
                     }} onClick={e => { e.stopPropagation(); onAnalyze(d.ip); }}>
                       TAHLIL
                     </button>
@@ -1477,22 +1508,22 @@ function NetworkPage({ onAnalyze }) {
         )}
       </Panel>
 
-      <Panel title="LOCAL SCAN GUIDE" color="#8b5cf6" style={{ marginTop: 14 }}>
+      <Panel title="LOCAL SCAN GUIDE" color={purple} style={{ marginTop: 14 }}>
         <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 }}>
             {localScanSteps.map(step => (
               <div key={step.title} style={{
-                border: '1px solid rgba(139,92,246,.28)',
-                background: 'linear-gradient(180deg, rgba(24,18,44,.78), rgba(10,14,28,.94))',
+                border: `1px solid ${purple}55`,
+                background: `linear-gradient(180deg, ${purple}16, rgba(10,14,28,.94))`,
                 padding: 14,
                 minHeight: 146,
               }}>
-                <div style={{ color: '#c4b5fd', fontSize: 11, letterSpacing: 2, marginBottom: 8 }}>{step.title}</div>
+                <div style={{ color: purpleSoft, fontSize: 11, letterSpacing: 2, marginBottom: 8 }}>{step.title}</div>
                 <div style={{ color: 'var(--text)', fontSize: 12, lineHeight: 1.75, marginBottom: 12 }}>{step.text}</div>
                 <div style={{
-                  border: '1px solid rgba(139,92,246,.3)',
-                  background: 'rgba(139,92,246,.08)',
-                  color: '#d8b4fe',
+                  border: `1px solid ${purple}66`,
+                  background: `${purple}14`,
+                  color: purpleSoft,
                   padding: '8px 10px',
                   fontSize: 11,
                   fontFamily: 'Share Tech Mono',
@@ -1509,8 +1540,8 @@ function NetworkPage({ onAnalyze }) {
                     justifyContent: 'center',
                     minHeight: 34,
                     padding: '0 12px',
-                    border: '1px solid rgba(0,229,255,.35)',
-                    color: '#00e5ff',
+                    border: `1px solid ${cyan}66`,
+                    color: cyan,
                     textDecoration: 'none',
                     fontSize: 11,
                     fontFamily: 'Share Tech Mono',
@@ -1527,7 +1558,7 @@ function NetworkPage({ onAnalyze }) {
             background: 'rgba(8,15,28,.72)',
             padding: 14,
           }}>
-            <div style={{ color: '#39ff14', fontSize: 11, letterSpacing: 2, marginBottom: 10 }}>BAT FAYLLAR</div>
+            <div style={{ color: cyan, fontSize: 11, letterSpacing: 2, marginBottom: 10 }}>BAT FAYLLAR</div>
             {[
               ['setup_project.bat', 'Birinchi o‘rnatish: venv, migrate, npm install'],
               ['start_backend.bat', 'Django/ASGI backendni yoqadi'],
@@ -1535,17 +1566,17 @@ function NetworkPage({ onAnalyze }) {
               ['start_all.bat', 'Backend va frontendni birga yoqadi'],
               ['enable_local_scan.bat', 'Protocol install + local agent start'],
             ].map(([name, desc]) => (
-              <div key={name} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(159,194,234,.1)' }}>
-                <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#00e5ff', marginBottom: 4 }}>{name}</div>
-                <div style={{ color: '#7ab8d4', fontSize: 12, lineHeight: 1.65 }}>{desc}</div>
+              <div key={name} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${panelBorder}` }}>
+                <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: cyan, marginBottom: 4 }}>{name}</div>
+                <div style={{ color: cyanDim, fontSize: 12, lineHeight: 1.65 }}>{desc}</div>
               </div>
             ))}
             <div style={{
               marginTop: 8,
               padding: 10,
-              border: '1px solid rgba(0,229,255,.18)',
-              background: 'rgba(0,229,255,.04)',
-              color: '#9fe8ff',
+              border: `1px solid ${cyan}44`,
+              background: panelGlow,
+              color: cyanSoft,
               fontSize: 12,
               lineHeight: 1.75,
             }}>
@@ -1562,7 +1593,7 @@ function NetworkPage({ onAnalyze }) {
               padding: 10,
               border: '1px solid rgba(57,255,20,.18)',
               background: 'rgba(57,255,20,.05)',
-              color: '#b4ff9d',
+              color: cyanSoft,
               fontSize: 12,
               lineHeight: 1.7,
             }}>
@@ -1575,7 +1606,7 @@ function NetworkPage({ onAnalyze }) {
       </Panel>
 
       {repInfo && (
-        <Panel title={`IP REPUTATSIYA | ${repInfo.ip}`} color="#ffab00" style={{ marginTop: 14 }}>
+        <Panel title={`IP REPUTATSIYA | ${repInfo.ip}`} color={amberTone} style={{ marginTop: 14 }}>
           <div className="panel-body" style={{ fontSize: 13 }}>
             {repInfo.is_local ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -1601,7 +1632,7 @@ function NetworkPage({ onAnalyze }) {
       )}
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:14 }}>
-        <Panel title="SAFE IP COLLECTOR" color="#00e5ff">
+        <Panel title="SAFE IP COLLECTOR" color={cyan}>
           <div className="panel-body">
             <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr .6fr auto', gap:10, alignItems:'center' }}>
               <input value={safeScanForm.ip} onChange={e => setSafeScanForm(form => ({ ...form, ip: e.target.value }))} placeholder="IP address" style={inputStyle}/>
@@ -1618,10 +1649,10 @@ function NetworkPage({ onAnalyze }) {
               <div style={{ marginTop:12, display:'grid', gap:10 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10 }}>
                   {[
-                    ['Target', safeScanResult.ip, '#00e5ff'],
+                    ['Target', safeScanResult.ip, cyan],
                     ['Open ports', `${safeScanResult.open_ports?.length || 0} ta`, '#39ff14'],
-                    ['Timeout', `${safeScanResult.timeout_seconds}s`, '#9fc2ea'],
-                    ['Cache', safeScanResult.cached ? 'HIT' : 'MISS', safeScanResult.cached ? '#ffab00' : '#4ade80'],
+                    ['Timeout', `${safeScanResult.timeout_seconds}s`, cyanSoft],
+                    ['Cache', safeScanResult.cached ? 'HIT' : 'MISS', safeScanResult.cached ? amberTone : '#4ade80'],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
                       <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
@@ -1632,9 +1663,9 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:8 }}>
                   {(safeScanResult.port_details || []).map(item => (
                     <div key={item.port} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:item.open ? 'rgba(57,255,20,.05)' : 'rgba(255,255,255,.02)' }}>
-                      <div style={{ color:'#7ab8d4', fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>PORT {item.port}</div>
+                      <div style={{ color:cyanDim, fontFamily:'Share Tech Mono', fontSize:11, marginBottom:4 }}>PORT {item.port}</div>
                       <div style={{ color:item.open ? '#39ff14' : '#4a6a84', fontFamily:'Share Tech Mono', fontSize:12 }}>{item.open ? 'OPEN' : 'CLOSED'}</div>
-                      <div style={{ color:'#94b4c8', fontSize:11, marginTop:4 }}>{item.latency_ms} ms</div>
+                      <div style={{ color:cyanSoft, fontSize:11, marginTop:4 }}>{item.latency_ms} ms</div>
                     </div>
                   ))}
                 </div>
@@ -1648,7 +1679,7 @@ function NetworkPage({ onAnalyze }) {
           </div>
         </Panel>
 
-        <Panel title="SIMULATED TRAFFIC LAB" color="#ff1744">
+        <Panel title="SIMULATED TRAFFIC LAB" color={redTone}>
           <div className="panel-body">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr .7fr auto', gap:10, alignItems:'center' }}>
               <input value={simForm.ip} onChange={e => setSimForm(form => ({ ...form, ip: e.target.value }))} placeholder="Target IP" style={inputStyle}/>
@@ -1662,7 +1693,7 @@ function NetworkPage({ onAnalyze }) {
                 {simBusy ? 'SIM...' : 'SIMULATE'}
               </button>
             </div>
-            <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, color:'#94b4c8', fontSize:12 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:10, color:cyanSoft, fontSize:12 }}>
               <input type="checkbox" checked={simForm.auto_response} onChange={e => setSimForm(form => ({ ...form, auto_response: e.target.checked }))}/>
               Safe auto-response ni simulyatsiya qilish
             </label>
@@ -1671,9 +1702,9 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4, minmax(0, 1fr))', gap:10 }}>
                   {[
                     ['Threat', simResult.analysis?.threat_level || '-', threatLevelColor(simResult.analysis?.threat_level)],
-                    ['Attack', simResult.analysis?.attack_type || '-', '#00e5ff'],
-                    ['Confidence', `${simResult.analysis?.confidence || 0}%`, '#9fc2ea'],
-                    ['Blocked', simResult.blocked ? 'YES' : 'NO', simResult.blocked ? '#39ff14' : '#ffab00'],
+                    ['Attack', simResult.analysis?.attack_type || '-', cyan],
+                    ['Confidence', `${simResult.analysis?.confidence || 0}%`, cyanSoft],
+                    ['Blocked', simResult.blocked ? 'YES' : 'NO', simResult.blocked ? '#39ff14' : amberTone],
                   ].map(([label, value, color]) => (
                     <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
                       <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:2, marginBottom:6 }}>{label}</div>
@@ -1681,9 +1712,9 @@ function NetworkPage({ onAnalyze }) {
                     </div>
                   ))}
                 </div>
-                <div style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(255,23,68,.04)' }}>
+                <div style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:`${redTone}12` }}>
                   {(simResult.analysis?.signals || []).map(item => (
-                    <div key={item} style={{ color:'#94b4c8', fontSize:12, marginBottom:6 }}>{item}</div>
+                    <div key={item} style={{ color:cyanSoft, fontSize:12, marginBottom:6 }}>{item}</div>
                   ))}
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
@@ -1698,7 +1729,7 @@ function NetworkPage({ onAnalyze }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-        <Panel title="WIFI HOLATI" color="#00e5ff">
+        <Panel title="WIFI HOLATI" color={cyan}>
           <div className="panel-body">
             {!wifiStatus && <div style={{ color: '#4a6a84' }}>Wi-Fi holati yuklanmoqda...</div>}
             {wifiStatus && (
@@ -1709,16 +1740,16 @@ function NetworkPage({ onAnalyze }) {
                   <div><span style={{ color: '#4a6a84' }}>Connected SSID: </span>{wifiStatus.connected_ssid || '-'}</div>
                   <div><span style={{ color: '#4a6a84' }}>Interface: </span>{wifiStatus.connected_interface || '-'}</div>
                 </div>
-                <div style={{ color: '#94b4c8', fontSize: 12, marginBottom: 12 }}>{displayText(wifiStatus.message)}</div>
+                <div style={{ color: cyanSoft, fontSize: 12, marginBottom: 12 }}>{displayText(wifiStatus.message)}</div>
 
                 {!wifiStatus.wifi_adapter_available && (
-                  <div style={{ color: '#ffab00', fontSize: 12 }}>
+                  <div style={{ color: amberTone, fontSize: 12 }}>
                     Wi-Fi adapter yo&apos;q. Ethernet yoki virtual adapter ma&apos;lumotlari orqali scan davom etadi.
                   </div>
                 )}
 
                 {wifiStatus.wifi_adapter_available && !wifiStatus.service_running && (
-                  <div style={{ color: '#ffab00', fontSize: 12 }}>
+                  <div style={{ color: amberTone, fontSize: 12 }}>
                     Wireless AutoConfig xizmati o&apos;chiq. Wi-Fi scan/connect uchun Windows&apos;da `wlansvc` yoqilishi kerak.
                   </div>
                 )}
@@ -1739,15 +1770,15 @@ function NetworkPage({ onAnalyze }) {
                             }));
                           }} style={{
                             padding: 10,
-                            border: `1px solid ${active ? 'var(--cyan)' : 'var(--border2)'}`,
-                            background: active ? 'rgba(0,229,255,.06)' : 'transparent',
+                            border: `1px solid ${active ? panelBorder : 'var(--border2)'}`,
+                            background: active ? panelGlowStrong : 'transparent',
                             cursor: 'pointer',
                           }}>
                             <div style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>{net.ssid || '(hidden)'}</div>
-                            <div style={{ color: '#4a6a84', fontSize: 11, fontFamily: 'Share Tech Mono' }}>
+                            <div style={{ color: cyanDim, fontSize: 11, fontFamily: 'Share Tech Mono' }}>
                               {net.signal || '-'} | {net.authentication || '-'}
                             </div>
-                            <div style={{ color: '#4a6a84', fontSize: 11, fontFamily: 'Share Tech Mono' }}>
+                            <div style={{ color: cyanDim, fontSize: 11, fontFamily: 'Share Tech Mono' }}>
                               {net.encryption || '-'} | BSSID {net.bssid_count}
                             </div>
                           </div>
@@ -1766,7 +1797,7 @@ function NetworkPage({ onAnalyze }) {
                         {wifiBusy ? 'ULANMOQDA...' : 'WIFI CONNECT'}
                       </button>
                     </div>
-                    {wifiError && <div style={{ color: '#ff8fa0', fontSize: 12, marginTop: 10 }}>{wifiError}</div>}
+                    {wifiError && <div style={{ color: redSoft, fontSize: 12, marginTop: 10 }}>{wifiError}</div>}
                   </>
                 )}
               </>
@@ -1775,7 +1806,7 @@ function NetworkPage({ onAnalyze }) {
         </Panel>
 
         <Panel title="ULANISH VA TAHLIL" color="#39ff14">
-          <div className="panel-body" style={{ fontSize: 12, color: '#94b4c8', lineHeight: 1.8 }}>
+          <div className="panel-body" style={{ fontSize: 12, color: cyanSoft, lineHeight: 1.8 }}>
             <div>1. Wi-Fi adapter bo&apos;lsa SSID tanlanadi yoki qo&apos;lda kiritiladi.</div>
             <div>2. Password kiritilib Windows darajasida ulanishga urinish qilinadi.</div>
             <div>3. Ulangan tarmoq yoki Ethernet interfeys bo&apos;yicha subnet aniqlanadi.</div>
@@ -1797,8 +1828,8 @@ function NetworkPage({ onAnalyze }) {
                 return (
                   <div key={item.name} onClick={() => setSelectedInterface(item.name)} style={{
                     padding: 12,
-                    border: `1px solid ${isActive ? 'var(--cyan)' : 'var(--border2)'}`,
-                    background: isActive ? 'rgba(0,229,255,.06)' : 'transparent',
+                    border: `1px solid ${isActive ? panelBorder : 'var(--border2)'}`,
+                    background: isActive ? panelGlow : 'transparent',
                     cursor: 'pointer',
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -1806,7 +1837,7 @@ function NetworkPage({ onAnalyze }) {
                         <div style={{ color: 'var(--text)', fontWeight: 700 }}>{displayText(item.name)}</div>
                         <div style={{ fontSize: 11, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>{displayText(item.adapter_type)}</div>
                       </div>
-                      <div style={{ textAlign: 'right', fontFamily: 'Share Tech Mono', fontSize: 11, color: '#7ab8d4' }}>
+                      <div style={{ textAlign: 'right', fontFamily: 'Share Tech Mono', fontSize: 11, color: cyanDim }}>
                         {displayText(item.ssid || item.subnet_cidr)}
                       </div>
                     </div>
@@ -1841,7 +1872,7 @@ function NetworkPage({ onAnalyze }) {
           </div>
         </Panel>
 
-        <Panel title="CONNECTION PROFILE" color="#a855f7">
+        <Panel title="CONNECTION PROFILE" color={purple}>
           <div className="panel-body">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} placeholder="Profile nomi" style={inputStyle}/>
@@ -1868,17 +1899,17 @@ function NetworkPage({ onAnalyze }) {
               </span>
             </div>
             {profileForm.profile_type === 'web' && (
-              <div style={{ color: '#7ab8d4', fontSize: 12, marginTop: 10 }}>
+              <div style={{ color: cyanDim, fontSize: 12, marginTop: 10 }}>
                 `WEB/HTTP` router va admin panel uchun xavfsiz probe qiladi: sarlavha, title, status, auth va latency ko&apos;rsatiladi.
               </div>
             )}
-            {profileError && <div style={{ color: '#ff8fa0', fontSize: 12, marginTop: 10 }}>{profileError}</div>}
+            {profileError && <div style={{ color: redSoft, fontSize: 12, marginTop: 10 }}>{profileError}</div>}
           </div>
         </Panel>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-        <Panel title={`SAQLANGAN PROFILLAR | ${profiles.length}`} color="#ffab00">
+        <Panel title={`SAQLANGAN PROFILLAR | ${profiles.length}`} color={amberTone}>
           <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {profiles.map(profile => (
               <div key={profile.id} style={{ padding: 12, border: '1px solid var(--border2)', background: 'var(--panel2)' }}>
@@ -1905,7 +1936,7 @@ function NetworkPage({ onAnalyze }) {
           </div>
         </Panel>
 
-        <Panel title={`SCAN SESSIONS | ${sessions.length}`} color="#ff1744">
+        <Panel title={`SCAN SESSIONS | ${sessions.length}`} color={redTone}>
           <div className="panel-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {sessions.map(session => (
               <div key={session.id} style={{ padding: 12, border: '1px solid var(--border2)', background: 'var(--panel2)' }}>
@@ -1925,7 +1956,7 @@ function NetworkPage({ onAnalyze }) {
                     ANALYZE
                   </button>
                 </div>
-                <div style={{ fontSize: 12, color: '#94b4c8', marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: cyanSoft, marginTop: 8 }}>
                   {session.status === 'failed'
                     ? displayText(session.error_message || session.summary || 'Natija kutilmoqda')
                     : displayText(session.summary || session.error_message || 'Natija kutilmoqda')}
@@ -1945,9 +1976,9 @@ function NetworkPage({ onAnalyze }) {
                     marginTop: 8,
                     padding: '10px 12px',
                     border: '1px solid var(--border2)',
-                    background: 'rgba(0,229,255,.03)',
+                    background: panelGlow,
                     fontSize: 11,
-                    color: '#7ab8d4',
+                    color: cyanDim,
                     fontFamily: 'Share Tech Mono',
                     whiteSpace: 'pre-wrap',
                     lineHeight: 1.6,
