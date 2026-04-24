@@ -4,6 +4,9 @@
   --panel2: #0d1b2e;
   --border: #1a3a5c;
   --border2: #0f2a44;
+  --accent-soft: rgba(0,229,255,.05);
+  --accent-soft-strong: rgba(0,229,255,.08);
+  --accent-ring: rgba(0,229,255,.15);
   --cyan: #00e5ff;
   --cyan2: #00b4cc;
   --green: #39ff14;
@@ -20,23 +23,26 @@
 
 :root[data-theme='hacker'],
 body[data-theme='hacker'] {
-  --bg: #010401;
-  --panel: #030903;
-  --panel2: #071107;
+  --bg: #000000;
+  --panel: #020502;
+  --panel2: #040904;
   --border: #145214;
   --border2: #0b320b;
-  --cyan: #39ff14;
-  --cyan2: #1ed760;
+  --accent-soft: rgba(4,12,4,.92);
+  --accent-soft-strong: rgba(6,18,6,.98);
+  --accent-ring: rgba(57,255,20,.14);
+  --cyan: #5dff4a;
+  --cyan2: #39ff14;
   --green: #5dff4a;
-  --red: #39ff14;
-  --amber: #83ff6d;
-  --purple: #39ff14;
-  --text: #d9ffd1;
-  --text-dim: #4f8d4f;
-  --text-mono: #8dff84;
-  --glow-cyan: 0 0 10px rgba(57,255,20,.75), 0 0 24px rgba(57,255,20,.35);
+  --red: #ff4d6d;
+  --amber: #ffb703;
+  --purple: #5dff4a;
+  --text: #caffbf;
+  --text-dim: #76c76b;
+  --text-mono: #b8ffab;
+  --glow-cyan: 0 0 10px rgba(93,255,74,.75), 0 0 24px rgba(93,255,74,.25);
   --glow-green: 0 0 10px rgba(93,255,74,.75), 0 0 24px rgba(93,255,74,.35);
-  --glow-red: 0 0 10px rgba(57,255,20,.75), 0 0 24px rgba(57,255,20,.35);
+  --glow-red: 0 0 10px rgba(255,77,109,.75), 0 0 24px rgba(255,77,109,.3);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,15 +90,15 @@ body::before {
 }
 .scan-beam {
   position: absolute; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0,229,255,.6), transparent);
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
   animation: scanBeam 4s linear infinite;
   pointer-events: none;
 }
 .login-card {
   position: relative; width: 420px; padding: 48px 40px;
-  background: rgba(8,15,28,.95);
+  background: var(--panel);
   border: 1px solid var(--border);
-  box-shadow: 0 0 60px rgba(0,229,255,.1), inset 0 0 60px rgba(0,229,255,.03);
+  box-shadow: 0 0 60px var(--accent-ring), inset 0 0 60px var(--accent-soft);
 }
 .login-card::before, .login-card::after {
   content: ''; position: absolute;
@@ -108,12 +114,12 @@ body::before {
 .login-field { margin-bottom: 18px; }
 .login-field label { display: block; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); margin-bottom: 6px; font-weight: 600; }
 .login-field input {
-  width: 100%; background: rgba(0,229,255,.04);
+  width: 100%; background: var(--accent-soft);
   border: 1px solid var(--border); color: var(--text);
   padding: 11px 14px; font-family: 'Share Tech Mono',monospace;
   font-size: 14px; outline: none; transition: all .2s;
 }
-.login-field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0,229,255,.15); }
+.login-field input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--accent-ring); }
 .login-btn {
   width: 100%; padding: 13px; background: transparent;
   border: 1px solid var(--cyan); color: var(--cyan);
@@ -155,7 +161,7 @@ body::before {
 .topbar-theme-btn,
 .theme-toggle-btn {
   border: 1px solid var(--border);
-  background: rgba(0,229,255,.05);
+  background: var(--accent-soft);
   color: var(--cyan);
   font-family: 'Share Tech Mono', monospace;
   cursor: pointer;
@@ -198,8 +204,8 @@ body::before {
   font-size: 14px; font-weight: 600; letter-spacing: .5px;
   position: relative; border-left: 2px solid transparent;
 }
-.nav-item:hover  { color: var(--text); background: rgba(0,229,255,.05); }
-.nav-item.active { color: var(--cyan); background: rgba(0,229,255,.08); border-left-color: var(--cyan); }
+.nav-item:hover  { color: var(--text); background: var(--accent-soft); }
+.nav-item.active { color: var(--cyan); background: var(--accent-soft-strong); border-left-color: var(--cyan); }
 .nav-item .ico   { width: 18px; text-align: center; font-size: 15px; }
 .nav-badge {
   margin-left: auto; background: var(--red); color: #fff;
@@ -280,7 +286,7 @@ body::before {
 .stat-card.c-amber::before  { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
 .stat-label { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); font-weight: 700; margin-bottom: 8px; }
 .stat-value { font-family: 'Orbitron',monospace; font-size: 28px; font-weight: 700; line-height: 1; }
-.stat-value.c-cyan  { color: var(--cyan);  text-shadow: 0 0 12px rgba(0,229,255,.5); }
+.stat-value.c-cyan  { color: var(--cyan);  text-shadow: var(--glow-cyan); }
 .stat-value.c-green { color: var(--green); text-shadow: 0 0 12px rgba(57,255,20,.5); }
 .stat-value.c-red   { color: var(--red);   text-shadow: 0 0 12px rgba(255,23,68,.5); }
 .stat-value.c-amber { color: var(--amber); text-shadow: 0 0 12px rgba(255,171,0,.5); }
@@ -301,7 +307,7 @@ body::before {
 /* ── ALERT FEED ── */
 .alert-feed { max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
 .alert-item { padding: 9px 14px; border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 10px; animation: slideRight .3s ease; font-size: 13px; }
-.alert-item:hover { background: rgba(0,229,255,.03); }
+.alert-item:hover { background: var(--accent-soft); }
 .alert-item .time { font-family: 'Share Tech Mono',monospace; font-size: 10px; color: var(--text-dim); min-width: 62px; }
 
 /* ── RISK GAUGE ── */
@@ -326,11 +332,11 @@ body::before {
   font-size: 11px; cursor: pointer; transition: all .2s; letter-spacing: 1px;
 }
 .filter-btn:hover  { border-color: var(--cyan); color: var(--cyan); }
-.filter-btn.active { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,.08); }
+.filter-btn.active { border-color: var(--cyan); color: var(--cyan); background: var(--accent-soft-strong); }
 .alerts-table { width: 100%; border-collapse: collapse; }
 .alerts-table th { text-align: left; font-size: 10px; letter-spacing: 2px; color: var(--text-dim); padding: 8px 12px; border-bottom: 1px solid var(--border); font-weight: 700; }
 .alerts-table td { padding: 10px 12px; border-bottom: 1px solid var(--border2); font-size: 13px; vertical-align: middle; }
-.alerts-table tr:hover td { background: rgba(0,229,255,.03); }
+.alerts-table tr:hover td { background: var(--accent-soft); }
 .td-mono { font-family: 'Share Tech Mono',monospace; font-size: 12px; color: var(--text-mono); }
 .conf-bar-wrap { display: flex; align-items: center; gap: 8px; }
 .conf-bar      { height: 4px; background: var(--border2); overflow: hidden; }

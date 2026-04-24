@@ -43,17 +43,17 @@ function themeAccent(name, fallback) {
   const mode = document.documentElement.getAttribute('data-theme') || 'classic';
   if (mode !== 'hacker') return fallback;
   const map = {
-    cyan: '#39ff14',
-    cyanSoft: '#8dff84',
-    cyanDim: '#4f8d4f',
-    purple: '#66ff66',
-    purpleSoft: '#9dff9d',
-    amber: '#83ff6d',
-    red: '#5dff4a',
-    redSoft: '#b8ffab',
-    panelGlow: 'rgba(57,255,20,.08)',
-    panelGlowStrong: 'rgba(57,255,20,.14)',
-    panelBorder: 'rgba(57,255,20,.3)',
+    cyan: '#5dff4a',
+    cyanSoft: '#b8ffab',
+    cyanDim: '#76c76b',
+    purple: '#5dff4a',
+    purpleSoft: '#b8ffab',
+    amber: '#ffb703',
+    red: '#ff4d6d',
+    redSoft: '#ff9db0',
+    panelGlow: 'rgba(2,8,2,.88)',
+    panelGlowStrong: 'rgba(4,16,4,.96)',
+    panelBorder: 'rgba(57,255,20,.24)',
   };
   return map[name] || fallback;
 }
