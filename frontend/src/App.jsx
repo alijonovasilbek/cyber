@@ -61,10 +61,84 @@ const ALGO_VISUAL_METRICS = {
 };
 
 const DATASETS = [
-  { name:'NSL-KDD',    records:'125,973',   pct:10,  desc:'1999-KDD yaxshilangan versiyasi. 41 xususiyat, 4 hujum kategoriyasi: DoS, Probe, R2L, U2R.' },
-  { name:'CICIDS2017', records:'2,830,743', pct:100, desc:'Canadian Institute for Cybersecurity. DDoS, PortScan, Botnet, Infiltration. 80+ feature.' },
-  { name:'UNSW-NB15',  records:'2,540,047', pct:90,  desc:'UNSW Canberra. 9 hujum turi, 49 xususiyat. Fuzzers, Exploits, Backdoors va boshqalar.' },
-  { name:'CAIDA DDoS', records:'~800,000',  pct:28,  desc:'Faqat DDoS hujumlarini tahlil qilish uchun. Real internet trafigi asosida yig\'ilgan.' },
+  {
+    name:'NSL-KDD',
+    records:'125,973',
+    pct:10,
+    desc:'1999-KDD yaxshilangan versiyasi. 41 xususiyat, 4 hujum kategoriyasi: DoS, Probe, R2L, U2R.',
+    source:'University of New Brunswick / KDDCup lineage',
+    fit:'Boshlang\'ich intrusion detection modeli va klassik supervised baseline uchun qulay.',
+    attacks:['DoS','Probe','R2L','U2R'],
+    features:['duration','protocol_type','service','src_bytes','dst_bytes'],
+    models:['Random Forest','SVM','XGBoost'],
+    sample:'tcp | http | src_bytes=181 | dst_bytes=5450 | label=normal',
+    caution:'Eski dataset. Zamonaviy SaaS, cloud va encrypted traffic patternlarini to\'liq qamrab olmaydi.',
+  },
+  {
+    name:'CICIDS2017',
+    records:'2,830,743',
+    pct:100,
+    desc:'Canadian Institute for Cybersecurity. DDoS, PortScan, Botnet, Infiltration. 80+ feature.',
+    source:'CICFlowMeter asosidagi zamonaviy enterprise traffic capture',
+    fit:'Real SOC demo, network flow tahlili va ko\'p turdagi attack sinflari uchun eng tushunarli dataset.',
+    attacks:['DDoS','PortScan','Botnet','Infiltration','Brute Force','Web Attack'],
+    features:['flow_duration','tot_fwd_pkts','flow_byts/s','pkt_len_mean','syn_flag_cnt'],
+    models:['Random Forest','XGBoost','LSTM'],
+    sample:'flow_duration=51234 | pkt_len_mean=824 | syn_flag_cnt=17 | label=ddos',
+    caution:'Feature soni ko\'p. Noto\'g\'ri preprocessing bo\'lsa leakage yoki class imbalance muammosi paydo bo\'ladi.',
+  },
+  {
+    name:'UNSW-NB15',
+    records:'2,540,047',
+    pct:90,
+    desc:'UNSW Canberra. 9 hujum turi, 49 xususiyat. Fuzzers, Exploits, Backdoors va boshqalar.',
+    source:'IXIA traffic generator bilan laboratoriya + normal enterprise aralash trafiki',
+    fit:'Modern attack taxonomy va anomaliya/klassifikatsiya kombinatsiyasi uchun yaxshi.',
+    attacks:['Fuzzers','Exploits','Backdoors','Worms','Reconnaissance','Shellcode'],
+    features:['sbytes','dbytes','sttl','dttl','ct_srv_src'],
+    models:['XGBoost','Isolation Forest','Autoencoder'],
+    sample:'sbytes=2240 | dttl=29 | ct_srv_src=9 | service=http | label=exploit',
+    caution:'Ba\'zi sinflar kam uchraydi. Stratified split va class weighting ishlatish kerak.',
+  },
+  {
+    name:'CAIDA DDoS',
+    records:'~800,000',
+    pct:28,
+    desc:'Faqat DDoS hujumlarini tahlil qilish uchun. Real internet trafigi asosida yig\'ilgan.',
+    source:'CAIDA backbone traffic traces / anonymized packet-level capture',
+    fit:'DDoS detection, volumetric anomaly va threshold tuning uchun kuchli maxsus dataset.',
+    attacks:['DDoS','Flood','Reflection-like burst'],
+    features:['packet_rate','byte_rate','burstiness','src_entropy','ttl_distribution'],
+    models:['Isolation Forest','LSTM','Autoencoder'],
+    sample:'pps=182000 | byte_rate=910Mbps | src_entropy=0.18 | label=attack',
+    caution:'Tor yo\'nalishli dataset. SQLi, phishing yoki endpoint hujumlari uchun mos emas.',
+  },
+  {
+    name:'TON_IoT',
+    records:'~20,000,000+',
+    pct:76,
+    desc:'IoT, telemetry, operating system va network layer ma\'lumotlarini birlashtiradi. Smart device muhitlari uchun foydali.',
+    source:'UNSW Canberra Cyber Range / IoT + IIoT lab environment',
+    fit:'IoT kamera, sensor, gateway va edge monitoring senariylari uchun tushunarli tanlov.',
+    attacks:['Scanning','DDoS','Password attack','Ransomware','Backdoor'],
+    features:['cpu','memory','network_rate','mqtt_flow','device_type'],
+    models:['LSTM','Autoencoder','Random Forest'],
+    sample:'device=camera | mqtt_flow=high | cpu=93% | network_rate=18MB/s | label=ddos',
+    caution:'Oddiy enterprise LAN dan farq qiladi. IoT bo\'lmagan muhitga to\'g\'ridan-to\'g\'ri ko\'chirish noto\'g\'ri xulosa berishi mumkin.',
+  },
+  {
+    name:'Bot-IoT',
+    records:'72,000,000+',
+    pct:84,
+    desc:'Botnet, DoS, DDoS va probing hodisalariga urg\'u berilgan juda katta hajmli IoT-centric dataset.',
+    source:'UNSW Cyber Range synthetic large-scale botnet traffic',
+    fit:'Massive flow analytics, botnet behaviour va stream-processing demo uchun yaxshi.',
+    attacks:['Botnet','DoS','DDoS','Probe','Information Theft'],
+    features:['pkts','bytes','rate','dur','state'],
+    models:['Isolation Forest','XGBoost','CNN'],
+    sample:'pkts=6480 | bytes=5.1MB | rate=high | state=CON | label=botnet',
+    caution:'Hajmi katta. Sampling, parquet/columnar storage va batch pipeline talab qiladi.',
+  },
 ];
 
 const SIEM_TOOLS = [
@@ -77,9 +151,9 @@ const SIEM_TOOLS = [
 ];
 
 const SIEM_CAPABILITY_ROWS = [
-  { key:'realtime', label:'Real vaqt', color:'#9fc2ea' },
-  { key:'ml', label:'ML/AI', color:'#b5cef0' },
-  { key:'cost', label:'Narx samaradorligi', color:'#94b7de' },
+  { key:'realtime', label:'Real vaqt', color:'#9fc2ea', desc:'Log kelishi, parse bo\'lishi va alert chiqishi qanchalik tez sodir bo\'ladi.' },
+  { key:'ml', label:'ML/AI', color:'#b5cef0', desc:'Anomaliya topish, korrelyatsiya va behavior analytics qobiliyati darajasi.' },
+  { key:'cost', label:'Narx samaradorligi', color:'#94b7de', desc:'Litsenziya, infra va operator xarajati hisobga olingandagi foyda.' },
 ];
 
 const THREAT_DETAIL_MAP = Object.fromEntries(THREAT_LIBRARY.map(item => [item.key, item]));
@@ -197,7 +271,99 @@ const NETWORK_TYPE_GUIDES = [
     summary: 'LAN, VPN, cloud va SaaS resurslari birga ishlaydi. Identity va telemetry markaziy rol o‘ynaydi.',
     pros: ['Cloud integratsiya oson', 'Remote access moslashuvchan', 'Telemetry-driven access control'],
   },
+  {
+    key: 'ring',
+    name: 'Ring Topology',
+    fit: 'Industrial loop, metro ethernet, token-style segment',
+    summary: 'Har bir node ikkita qo\'shni bilan ulanadi va trafik halqa bo\'ylab aylanadi.',
+    pros: ['Predictable path', 'Loop protection bilan barqaror', 'Industrial tarmoqlarda uchraydi'],
+  },
+  {
+    key: 'bus',
+    name: 'Bus Topology',
+    fit: 'Legacy segment, oddiy shared-medium lab',
+    summary: 'Barcha hostlar bitta umumiy backbone liniyaga ulangan bo\'ladi.',
+    pros: ['Tuzilishi sodda', 'Kichik lab uchun arzon', 'Shared medium tamoyilini tushuntirishga qulay'],
+  },
 ];
+
+const TOPOLOGY_VISUALS = {
+  star: {
+    nodes: [
+      { key:'core', label:'Switch / Firewall', x:50, y:30, tone:'core' },
+      { key:'pc1', label:'PC-1', x:24, y:16, tone:'internal' },
+      { key:'pc2', label:'PC-2', x:24, y:46, tone:'internal' },
+      { key:'srv1', label:'Server', x:76, y:16, tone:'service' },
+      { key:'srv2', label:'Printer / IoT', x:76, y:46, tone:'service' },
+      { key:'soc', label:'CyberGuard', x:50, y:72, tone:'observer' },
+    ],
+    edges: [['core','pc1'], ['core','pc2'], ['core','srv1'], ['core','srv2'], ['soc','core']],
+    caption: 'Markaziy qurilma orqali barcha hostlar bog\'lanadi. Kichik va o\'rta ofislar uchun eng ko\'p uchraydi.',
+  },
+  mesh: {
+    nodes: [
+      { key:'n1', label:'Core-1', x:32, y:22, tone:'core' },
+      { key:'n2', label:'Core-2', x:68, y:22, tone:'core' },
+      { key:'n3', label:'DB Cluster', x:68, y:58, tone:'service' },
+      { key:'n4', label:'App Cluster', x:32, y:58, tone:'service' },
+      { key:'n5', label:'CyberGuard', x:50, y:80, tone:'observer' },
+    ],
+    edges: [['n1','n2'], ['n2','n3'], ['n3','n4'], ['n4','n1'], ['n1','n3'], ['n2','n4'], ['n5','n1'], ['n5','n3']],
+    caption: 'Har bir muhim node bir nechta yo\'l bilan bog\'langan. Data center va HA segmentlarda ishlatiladi.',
+  },
+  tree: {
+    nodes: [
+      { key:'core', label:'Core', x:50, y:14, tone:'core' },
+      { key:'dist1', label:'Distribution A', x:32, y:34, tone:'service' },
+      { key:'dist2', label:'Distribution B', x:68, y:34, tone:'service' },
+      { key:'acc1', label:'Access 1', x:20, y:58, tone:'internal' },
+      { key:'acc2', label:'Access 2', x:44, y:58, tone:'internal' },
+      { key:'acc3', label:'Access 3', x:56, y:58, tone:'internal' },
+      { key:'acc4', label:'Access 4', x:80, y:58, tone:'internal' },
+      { key:'soc', label:'CyberGuard', x:50, y:80, tone:'observer' },
+    ],
+    edges: [['core','dist1'], ['core','dist2'], ['dist1','acc1'], ['dist1','acc2'], ['dist2','acc3'], ['dist2','acc4'], ['soc','core']],
+    caption: 'Core -> distribution -> access qatlamli korporativ yoki kampus arxitekturasi.',
+  },
+  hybrid: {
+    nodes: [
+      { key:'fw', label:'ZT Gateway', x:50, y:28, tone:'core' },
+      { key:'lan', label:'Office LAN', x:24, y:52, tone:'internal' },
+      { key:'cloud', label:'Cloud VPC', x:76, y:22, tone:'service' },
+      { key:'remote', label:'Remote User', x:18, y:18, tone:'observer' },
+      { key:'saas', label:'SaaS', x:80, y:52, tone:'service' },
+      { key:'soc', label:'CyberGuard', x:50, y:78, tone:'observer' },
+    ],
+    edges: [['fw','lan'], ['fw','cloud'], ['fw','remote'], ['fw','saas'], ['soc','fw'], ['cloud','saas']],
+    caption: 'On-prem, remote va cloud bitta identity/telemetry qatlamiga bog\'langan.',
+  },
+  ring: {
+    nodes: [
+      { key:'r1', label:'Node A', x:28, y:20, tone:'internal' },
+      { key:'r2', label:'Node B', x:50, y:12, tone:'service' },
+      { key:'r3', label:'Node C', x:72, y:20, tone:'internal' },
+      { key:'r4', label:'Node D', x:72, y:52, tone:'service' },
+      { key:'r5', label:'Node E', x:50, y:64, tone:'core' },
+      { key:'r6', label:'Node F', x:28, y:52, tone:'internal' },
+      { key:'soc', label:'CyberGuard', x:50, y:82, tone:'observer' },
+    ],
+    edges: [['r1','r2'], ['r2','r3'], ['r3','r4'], ['r4','r5'], ['r5','r6'], ['r6','r1'], ['soc','r5']],
+    caption: 'Trafik halqa bo\'ylab aylanadi. Industrial yoki metro tarmoqlarda uchraydi.',
+  },
+  bus: {
+    nodes: [
+      { key:'backbone', label:'Backbone', x:50, y:42, tone:'core' },
+      { key:'b1', label:'Host-1', x:18, y:18, tone:'internal' },
+      { key:'b2', label:'Host-2', x:34, y:18, tone:'internal' },
+      { key:'b3', label:'Host-3', x:50, y:18, tone:'service' },
+      { key:'b4', label:'Host-4', x:66, y:18, tone:'internal' },
+      { key:'b5', label:'Host-5', x:82, y:18, tone:'service' },
+      { key:'soc', label:'CyberGuard', x:50, y:74, tone:'observer' },
+    ],
+    edges: [['b1','backbone'], ['b2','backbone'], ['b3','backbone'], ['b4','backbone'], ['b5','backbone'], ['soc','backbone']],
+    caption: 'Bitta umumiy liniyaga barcha hostlar ulanadi. Legacy yoki lab tushuntirishlari uchun mos.',
+  },
+};
 
 const LIVE_TICKER_ITEMS = [
   'LOKAL TARMOQ SKANI FAQAT LIVE BACKEND NATIJALARINI KO\'RSATADI',
@@ -1112,18 +1278,24 @@ function NetworkPage({ onAnalyze }) {
       title: '1. Birinchi sozlash',
       text: 'Shu kompyuterda faqat bir marta local protocol o‘rnating.',
       bat: 'install_local_scan_protocol.bat',
+      action: "Protocolni o'rnatish",
     },
     {
       title: '2. Local agentni yoqing',
       text: 'Agent shu kompyuterning Wi-Fi, interface va lokal hostlarini o‘qiydi.',
       bat: 'start_local_agent.bat',
+      action: 'Agentni ishga tushirish',
     },
     {
       title: '3. Saytdan ishga tushiring',
       text: 'RUN LOCAL SCAN bosilganda sayt localhost agentga ulanadi va server emas, shu kompyuter tarmog‘ini ishlatadi.',
       bat: 'enable_local_scan.bat',
+      action: 'Ikkalasini birga yoqish',
     },
   ];
+  const currentScanSourceText = agentMode
+    ? "Hozir ko'rinayotgan hostlar local agent orqali aynan shu kompyuterdan olingan."
+    : "Hozir ko'rinayotgan hostlar local agentdan emas, backend ishlayotgan muhitdan olingan. Agar backend shu kompyuterda ishlayotgan bo'lsa ular real bo'lishi mumkin; agar backend serverda bo'lsa bu shu kompyuter tarmog'i emas.";
   const inputStyle = {
     width: '100%',
     background: 'rgba(0,229,255,.04)',
@@ -1171,6 +1343,17 @@ function NetworkPage({ onAnalyze }) {
                   Agar birinchi urinishda ishga tushmasa, shu kompyuterda `install_local_scan_protocol.bat` ni bir marta ishga tushiring.
                 </div>
               )}
+              <div style={{
+                marginBottom: 12,
+                padding: 12,
+                border: '1px solid rgba(0,229,255,.22)',
+                background: 'rgba(0,229,255,.05)',
+                color: '#9fe8ff',
+                fontSize: 12,
+                lineHeight: 1.7,
+              }}>
+                {currentScanSourceText}
+              </div>
               {agentError && (
                 <div style={{
                   marginBottom: 12,
@@ -1268,9 +1451,29 @@ function NetworkPage({ onAnalyze }) {
                   padding: '8px 10px',
                   fontSize: 11,
                   fontFamily: 'Share Tech Mono',
+                  marginBottom: 12,
                 }}>
                   {step.bat}
                 </div>
+                <a
+                  href={api.getLocalAgentDownloadUrl(step.bat)}
+                  download
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: 34,
+                    padding: '0 12px',
+                    border: '1px solid rgba(0,229,255,.35)',
+                    color: '#00e5ff',
+                    textDecoration: 'none',
+                    fontSize: 11,
+                    fontFamily: 'Share Tech Mono',
+                    letterSpacing: 1,
+                  }}
+                >
+                  {step.action} | YUKLAB OLISH
+                </a>
               </div>
             ))}
           </div>
@@ -1292,6 +1495,23 @@ function NetworkPage({ onAnalyze }) {
                 <div style={{ color: '#7ab8d4', fontSize: 12, lineHeight: 1.65 }}>{desc}</div>
               </div>
             ))}
+            <div style={{
+              marginTop: 8,
+              padding: 10,
+              border: '1px solid rgba(0,229,255,.18)',
+              background: 'rgba(0,229,255,.04)',
+              color: '#9fe8ff',
+              fontSize: 12,
+              lineHeight: 1.75,
+            }}>
+              Frontenddagi `YUKLAB OLISH` tugmasi `.bat` faylni brauzer orqali yuklab beradi.
+              <br />
+              1. <span style={{ fontFamily: 'Share Tech Mono' }}>Protocolni o&apos;rnatish</span> faylini ishga tushiring.
+              <br />
+              2. <span style={{ fontFamily: 'Share Tech Mono' }}>Agentni ishga tushirish</span> faylini ishga tushiring.
+              <br />
+              3. Sahifaga qaytib <span style={{ fontFamily: 'Share Tech Mono' }}>RUN LOCAL SCAN</span> ni bosing.
+            </div>
             <div style={{
               marginTop: 8,
               padding: 10,
@@ -1709,12 +1929,19 @@ function NetworkPage({ onAnalyze }) {
 
 function GlobalThreatMapPanel({ compact = false }) {
   const origins = [
-    { x: 12, y: 20 }, { x: 18, y: 58 }, { x: 31, y: 64 }, { x: 49, y: 30 },
-    { x: 54, y: 24 }, { x: 60, y: 35 }, { x: 69, y: 29 }, { x: 74, y: 23 },
+    { x: 12, y: 20, region: 'North America', type: 'Botnet C2', severity: 82 },
+    { x: 18, y: 58, region: 'South America', type: 'Phishing relay', severity: 61 },
+    { x: 31, y: 64, region: 'South Atlantic', type: 'Recon node', severity: 54 },
+    { x: 49, y: 30, region: 'Europe', type: 'Exploit scan', severity: 74 },
+    { x: 54, y: 24, region: 'Northern Europe', type: 'Credential attack', severity: 88 },
+    { x: 60, y: 35, region: 'Middle East', type: 'Proxy chain', severity: 67 },
+    { x: 69, y: 29, region: 'South Asia', type: 'DDoS reflector', severity: 79 },
+    { x: 74, y: 23, region: 'East Asia', type: 'Malware delivery', severity: 91 },
   ];
   const protectedNode = { x: 46, y: 46 };
-  const width = compact ? 520 : 680;
   const height = compact ? 240 : 320;
+  const topOrigins = [...origins].sort((a, b) => b.severity - a.severity).slice(0, compact ? 3 : 5);
+  const avgSeverity = Math.round(origins.reduce((sum, item) => sum + item.severity, 0) / origins.length);
 
   return (
     <div style={{ border: '1px solid var(--border2)', background: 'linear-gradient(180deg, rgba(7,18,35,.96), rgba(4,11,24,.98))' }}>
@@ -1738,6 +1965,30 @@ function GlobalThreatMapPanel({ compact = false }) {
         <circle cx={protectedNode.x} cy={protectedNode.y} r="3" fill="rgba(57,255,20,.12)"/>
         <circle cx={protectedNode.x + 1.4} cy={protectedNode.y - 1.6} r="0.9" fill="#74ff5c"/>
       </svg>
+      {!compact && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 12px 12px' }}>
+          <div style={{ padding: 12, border: '1px solid rgba(255,23,68,.18)', background: 'rgba(255,23,68,.06)' }}>
+            <div style={{ color: '#ff8fa0', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>THREAT SUMMARY</div>
+            <div style={{ color: 'var(--text)', fontSize: 18, fontFamily: 'Orbitron,monospace', marginBottom: 4 }}>{origins.length} ACTIVE ORIGINS</div>
+            <div style={{ color: '#9fc2ea', fontSize: 12, lineHeight: 1.6 }}>
+              O&apos;rtacha xavf darajasi <span style={{ color: '#ffab00', fontFamily: 'Share Tech Mono' }}>{avgSeverity}%</span>.
+              Karta qaysi regionlardan traffic kelayotganini va protected node&apos;ga oqimini ko&apos;rsatadi.
+            </div>
+          </div>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>TOP SOURCES</div>
+            {topOrigins.map(item => (
+              <div key={`${item.region}-${item.type}`} style={{ padding: '8px 0', borderBottom: '1px solid rgba(159,194,234,.1)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text)', fontSize: 12 }}>{item.region}</span>
+                  <span style={{ color: '#ff4668', fontFamily: 'Share Tech Mono', fontSize: 11 }}>{item.severity}%</span>
+                </div>
+                <div style={{ color: '#8eb6db', fontSize: 12 }}>{item.type}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 16, padding: '0 12px 12px', fontSize: 10, color: '#7ea8ca', fontFamily: 'Share Tech Mono', flexWrap: 'wrap' }}>
         <span style={{ color: '#ff4668' }}>● ATTACK ORIGIN</span>
         <span style={{ color: '#39ff14' }}>● PROTECTED NODE</span>
@@ -1810,8 +2061,78 @@ function ThreatFlowPanel({ threat, color }) {
   );
 }
 
+function DatasetIntelCard({ dataset }) {
+  return (
+    <Panel key={dataset.name} title={dataset.name} color="#ffab00">
+      <div className="panel-body">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'start', marginBottom: 12 }}>
+          <div>
+            <div style={{ color: '#7ab8d4', fontSize: 11, fontFamily: 'Share Tech Mono', marginBottom: 6 }}>{dataset.source}</div>
+            <div style={{ color: '#94b4c8', fontSize: 13, lineHeight: 1.7 }}>{dataset.desc}</div>
+          </div>
+          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00', padding: '2px 10px', border: '1px solid rgba(255,171,0,.4)', background: 'rgba(255,171,0,.08)' }}>
+            {dataset.records} yozuv
+          </span>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+            <span style={{ color: '#94b4c8' }}>Demo ichidagi foydalilik</span>
+            <span style={{ color: '#ffab00', fontFamily: 'Share Tech Mono' }}>{dataset.pct}%</span>
+          </div>
+          <div style={{ height: 4, background: 'var(--border2)' }}>
+            <div style={{ width: `${dataset.pct}%`, height: '100%', background: 'linear-gradient(90deg,#ffab00,#ff1744)', boxShadow: '0 0 6px rgba(255,171,0,.4)' }}/>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>QACHON ISHLATILADI</div>
+            <div style={{ color: '#dce8f5', fontSize: 12, lineHeight: 1.7 }}>{dataset.fit}</div>
+          </div>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>NAMUNA YOZUV</div>
+            <div style={{ color: '#9fc2ea', fontSize: 11, lineHeight: 1.7, fontFamily: 'Share Tech Mono' }}>{dataset.sample}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>HUJUM TURLARI</div>
+            {dataset.attacks.map(item => (
+              <div key={item} style={{ color: '#dce8f5', fontSize: 12, marginBottom: 6 }}>{item}</div>
+            ))}
+          </div>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>MUHIM FEATURELAR</div>
+            {dataset.features.map(item => (
+              <div key={item} style={{ color: '#9fc2ea', fontSize: 12, marginBottom: 6, fontFamily: 'Share Tech Mono' }}>{item}</div>
+            ))}
+          </div>
+          <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+            <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>MOS MODELLAR</div>
+            {dataset.models.map(item => (
+              <div key={item} style={{ color: '#b4ff9d', fontSize: 12, marginBottom: 6 }}>{item}</div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, padding: 12, border: '1px solid rgba(255,23,68,.2)', background: 'rgba(255,23,68,.05)', color: '#ffb3bf', fontSize: 12, lineHeight: 1.7 }}>
+          <span style={{ color: '#ff8fa0', fontFamily: 'Share Tech Mono' }}>CHEKLOV:</span> {dataset.caution}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function SIEMArchitecturePanel({ tool }) {
   const detail = SIEM_DETAIL_MAP[tool?.key] || { sources: [], pipeline: [], strengths: [], fit: [], ops: {} };
+  const snapshotRows = [
+    ['Ingest', detail.ops.deploy || 0, 'rgba(159,194,234,.14)', '#9fc2ea'],
+    ['Parse', detail.ops.tuning || 0, 'rgba(57,255,20,.12)', '#39ff14'],
+    ['Detect', Math.round(((detail.ops.deploy || 0) + (detail.ops.learning || 0)) / 2), 'rgba(255,171,0,.12)', '#ffab00'],
+    ['Respond', detail.ops.learning || 0, 'rgba(255,23,68,.1)', '#ff6b7f'],
+  ];
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1.15fr .85fr', gap: 12 }}>
@@ -1868,14 +2189,39 @@ function SIEMArchitecturePanel({ tool }) {
         </div>
         <div style={{ border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)', padding: 14 }}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: '#4a6a84', marginBottom: 10 }}>VISUAL SNAPSHOT</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, alignItems: 'stretch' }}>
-            <div style={{ border: '1px solid rgba(0,229,255,.18)', background: 'linear-gradient(180deg, rgba(0,229,255,.14), rgba(159,194,234,.06))' }}/>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(159,194,234,.12)' }}/>
-              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(57,255,20,.1)' }}/>
-              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(255,171,0,.1)' }}/>
-              <div style={{ height: 24, border: '1px solid var(--border2)', background: 'rgba(255,23,68,.08)' }}/>
+          <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 10, alignItems: 'stretch' }}>
+            <div style={{
+              border: '1px solid rgba(0,229,255,.18)',
+              background: 'linear-gradient(180deg, rgba(0,229,255,.14), rgba(159,194,234,.06))',
+              padding: 10,
+              display: 'grid',
+              alignContent: 'center',
+              justifyItems: 'center',
+              minHeight: 142,
+            }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', border: '1px solid rgba(0,229,255,.35)', background: 'rgba(0,229,255,.1)', boxShadow: '0 0 18px rgba(0,229,255,.14)' }}/>
+              <div style={{ marginTop: 10, color: '#00e5ff', fontSize: 10, fontFamily: 'Share Tech Mono', textAlign: 'center', lineHeight: 1.5 }}>
+                CORE
+                <br />
+                ENGINE
+              </div>
             </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {snapshotRows.map(([label, value, bg, tone]) => (
+                <div key={label} style={{ border: '1px solid var(--border2)', background: bg, padding: '8px 10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                    <span style={{ color: '#dce8f5', fontSize: 12 }}>{label}</span>
+                    <span style={{ color: tone, fontFamily: 'Share Tech Mono', fontSize: 11 }}>{value}%</span>
+                  </div>
+                  <div style={{ height: 5, background: 'rgba(159,194,234,.14)' }}>
+                    <div style={{ width: `${value}%`, height: '100%', background: `linear-gradient(90deg, ${tone}, rgba(255,255,255,.85))` }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 10, color: '#7ab8d4', fontSize: 12, lineHeight: 1.7 }}>
+            Mini snapshot tanlangan SIEM stack&apos;ning ingest, parse, detect va respond bosqichlaridagi nisbiy tayyorlik darajasini ko&apos;rsatadi.
           </div>
         </div>
       </div>
@@ -2576,22 +2922,44 @@ function InsightsPage({ initialTab = 'threats' }) {
       )}
 
       {tab === 'datasets' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-          {DATASETS.map(d => (
-            <Panel key={d.name} title={d.name} color="#ffab00">
-              <div className="panel-body">
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-                  <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00', padding: '2px 10px', border: '1px solid rgba(255,171,0,.4)', background: 'rgba(255,171,0,.08)' }}>
-                    {d.records} yozuv
-                  </span>
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr .8fr', gap: 14 }}>
+            <Panel title="DATASET TUSHUNCHASI" color="#ffab00">
+              <div className="panel-body" style={{ display: 'grid', gap: 12 }}>
+                <div style={{ color: '#dce8f5', fontSize: 14, lineHeight: 1.8 }}>
+                  Bu bo&apos;lim qaysi dataset nimaga kerakligini sodda qilib ko&apos;rsatadi:
+                  qaysi hujumlar bor, qaysi featurelar muhim, qaysi model bilan ishlatish qulay va amaliy cheklovlari nimaligini.
                 </div>
-                <p style={{ fontSize: 13, color: '#94b4c8', lineHeight: 1.7, marginBottom: 14 }}>{d.desc}</p>
-                <div style={{ height: 4, background: 'var(--border2)' }}>
-                  <div style={{ width: `${d.pct}%`, height: '100%', background: 'linear-gradient(90deg,#ffab00,#ff1744)', boxShadow: '0 0 6px rgba(255,171,0,.4)' }}/>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+                  {[
+                    ['Klassik baseline', 'NSL-KDD'],
+                    ['Eng muvozanatli tanlov', 'CICIDS2017'],
+                    ['Modern attack taxonomy', 'UNSW-NB15'],
+                    ['IoT va botnet', 'TON_IoT / Bot-IoT'],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.42)' }}>
+                      <div style={{ color: '#4a6a84', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>{label}</div>
+                      <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700 }}>{value}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </Panel>
-          ))}
+            <Panel title="QANDAY TANLASH KERAK" color="#39ff14">
+              <div className="panel-body" style={{ display: 'grid', gap: 10, fontSize: 12, color: '#9fc2ea', lineHeight: 1.7 }}>
+                <div>1. Agar demo uchun eng tushunarli va boy dataset kerak bo&apos;lsa: <span style={{ color: '#dce8f5' }}>CICIDS2017</span>.</div>
+                <div>2. Agar sizga eski IDS benchmark kerak bo&apos;lsa: <span style={{ color: '#dce8f5' }}>NSL-KDD</span>.</div>
+                <div>3. Agar zero-day yoki anomaly yondashuvini ko&apos;rsatmoqchi bo&apos;lsangiz: <span style={{ color: '#dce8f5' }}>UNSW-NB15</span> yoki <span style={{ color: '#dce8f5' }}>TON_IoT</span>.</div>
+                <div>4. Agar faqat DDoS va volumetric trafficni ko&apos;rsatmoqchi bo&apos;lsangiz: <span style={{ color: '#dce8f5' }}>CAIDA DDoS</span>.</div>
+              </div>
+            </Panel>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
+            {DATASETS.map(d => (
+              <DatasetIntelCard key={d.name} dataset={d} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -2672,13 +3040,19 @@ function SIEMPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr .8fr', gap: 14 }}>
         <Panel title="SIEM QOBILIYATLARI" color="#9fc2ea">
           <div className="panel-body">
+            <div style={{ marginBottom: 14, padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.45)', color: '#a5c2d8', fontSize: 13, lineHeight: 1.75 }}>
+              Bu jadval har bir SIEM mahsuloti qaysi yo&apos;nalishda kuchli ekanini ko&apos;rsatadi.
+              `Real vaqt` yuqori bo&apos;lsa alert tez chiqadi, `ML/AI` yuqori bo&apos;lsa anomaly va behavior analytics kuchliroq bo&apos;ladi,
+              `Narx samaradorligi` yuqori bo&apos;lsa umumiy xarajatga nisbatan foyda yaxshiroq bo&apos;ladi.
+            </div>
             {SIEM_CAPABILITY_ROWS.map(row => (
               <div key={row.key} style={{ marginBottom: 18 }}>
-                <div style={{ marginBottom: 8, color: 'var(--text)', fontSize: 13, fontWeight: 700 }}>{row.label}</div>
+                <div style={{ marginBottom: 4, color: 'var(--text)', fontSize: 13, fontWeight: 700 }}>{row.label}</div>
+                <div style={{ marginBottom: 8, color: '#7ab8d4', fontSize: 12 }}>{row.desc}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 6 }}>
                   {SIEM_TOOLS.map(tool => (
                     <div key={`${row.key}-${tool.key}`} style={{ background: 'rgba(13,27,46,.55)', border: '1px solid var(--border2)', padding: 6 }}>
-                      <div style={{ height: 42, background: 'rgba(255,255,255,.04)', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ height: 42, background: 'rgba(255,255,255,.04)', position: 'relative', overflow: 'hidden', marginBottom: 6 }}>
                         <div style={{
                           position: 'absolute',
                           left: 0,
@@ -2688,7 +3062,8 @@ function SIEMPage() {
                           background: `linear-gradient(180deg, ${row.color}, rgba(159,194,234,.75))`,
                         }}/>
                       </div>
-                      <div style={{ marginTop: 6, fontSize: 10, color: '#7b9dbd', textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.name.split(' ')[0]}</div>
+                      <div style={{ fontSize: 10, color: '#7b9dbd', textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.name.split(' ')[0]}</div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: row.color, textAlign: 'center', fontFamily: 'Share Tech Mono' }}>{tool.scores[row.key]}%</div>
                     </div>
                   ))}
                 </div>
@@ -2699,6 +3074,10 @@ function SIEMPage() {
 
         <Panel title="LOYIHA MOSLIGI" color="#39ff14">
           <div className="panel-body" style={{ display: 'grid', gap: 10 }}>
+            <div style={{ padding: 12, border: '1px solid var(--border2)', background: 'rgba(13,27,46,.45)', color: '#a5c2d8', fontSize: 13, lineHeight: 1.75 }}>
+              Bu blok “qaysi turdagi tashkilot yoki loyiha uchun qaysi SIEM ko&apos;proq mos” degan tez tavsiyani beradi.
+              Ya&apos;ni bu benchmark emas, tanlovni soddalashtiruvchi amaliy yo&apos;l-yo&apos;riq.
+            </div>
             {[
               ['Katta korxona', 'Splunk / QRadar'],
               ['Azure infra', 'MS Sentinel'],
@@ -2717,13 +3096,117 @@ function SIEMPage() {
   );
 }
 
+function estimateTopology(interfaces = [], devices = []) {
+  const activeInterfaces = interfaces.filter(item => item.ip || item.gateway || item.ssid);
+  const gatewayCount = activeInterfaces.filter(item => item.gateway).length;
+  const wifiCount = activeInterfaces.filter(item => item.adapter_type?.toLowerCase() === 'wireless lan').length;
+  const deviceCount = devices.length;
+
+  if (gatewayCount >= 2 || activeInterfaces.length >= 3) {
+    return {
+      name: 'Hybrid / Tree (taxminiy)',
+      reason: 'Bir nechta interface yoki gateway topildi. Bu ko\'p qatlamli yoki aralash segment borligini ko\'rsatadi.',
+      color: '#a78bfa',
+    };
+  }
+  if (wifiCount >= 1 && deviceCount >= 5) {
+    return {
+      name: 'Star Topology (taxminiy)',
+      reason: 'Ko\'p qurilma bitta gateway orqali ko\'rinmoqda. Uy/ofis Wi-Fi va switch-markazli LAN uchun odatiy holat.',
+      color: '#39ff14',
+    };
+  }
+  if (deviceCount <= 2) {
+    return {
+      name: 'Bus / Point Segment (taxminiy)',
+      reason: 'Qurilmalar kam ko\'rinmoqda. Bu kichik segment, lab yoki shared-medium qism bo\'lishi mumkin.',
+      color: '#ffab00',
+    };
+  }
+  return {
+    name: 'Star Topology (taxminiy)',
+    reason: 'Ko\'p lokal tarmoqlarda endpointlar markaziy switch yoki routerga ulanadi. Shu sabab eng ehtimoliy shakl shu.',
+    color: '#39ff14',
+  };
+}
+
+function TopologyVisualPanel({ guideKey }) {
+  const visual = TOPOLOGY_VISUALS[guideKey] || TOPOLOGY_VISUALS.star;
+  const nodeTone = tone => ({
+    hostile: { border:'rgba(255,107,87,.55)', bg:'rgba(255,107,87,.12)', color:'#ffd5cf' },
+    core: { border:'rgba(107,210,20,.55)', bg:'rgba(107,210,20,.12)', color:'#def8cf' },
+    service: { border:'rgba(159,194,234,.6)', bg:'rgba(159,194,234,.11)', color:'#d9e9fb' },
+    internal: { border:'rgba(189,232,153,.5)', bg:'rgba(189,232,153,.12)', color:'#ebf8dc' },
+    observer: { border:'rgba(138,124,245,.65)', bg:'rgba(138,124,245,.14)', color:'#e3dcff' },
+  }[tone]);
+  const visualNodeMap = Object.fromEntries(visual.nodes.map(node => [node.key, node]));
+
+  return (
+    <div style={{ border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(17,34,58,.78), rgba(3,7,18,.98))', minHeight: 420, position: 'relative', overflow: 'hidden', perspective: 1200 }}>
+      <div style={{ position:'absolute', inset:18, border:'1px solid rgba(0,229,255,.08)', transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:'0 0 80px rgba(0,229,255,.04) inset' }}/>
+      <div style={{ position:'absolute', inset:'10% 8%', background:'linear-gradient(180deg, rgba(0,229,255,.03), transparent)', transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
+      <svg viewBox="0 0 100 100" style={{ position:'absolute', inset:0, width:'100%', height:'100%' }}>
+        {[...Array(9)].map((_, index) => (
+          <line key={`visual-grid-v-${index}`} x1={8 + index * 10} y1="8" x2={8 + index * 10} y2="92" stroke="rgba(34,71,110,.18)" strokeWidth="0.15"/>
+        ))}
+        {[...Array(5)].map((_, index) => (
+          <line key={`visual-grid-h-${index}`} x1="6" y1={16 + index * 16} x2="94" y2={16 + index * 16} stroke="rgba(34,71,110,.14)" strokeWidth="0.15"/>
+        ))}
+        {visual.edges.map(([fromKey, toKey], index) => {
+          const from = visualNodeMap[fromKey];
+          const to = visualNodeMap[toKey];
+          return (
+            <g key={`${fromKey}-${toKey}`}>
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={index % 2 === 0 ? '#7df542' : '#8a7cf5'} strokeWidth="1.4" opacity="0.92"/>
+              <circle r="0.65" fill={index % 2 === 0 ? '#7df542' : '#8a7cf5'} style={{ filter:`drop-shadow(0 0 6px ${index % 2 === 0 ? '#7df542' : '#8a7cf5'})`, animation:`packetTravel ${2.2 + (index % 3) * .3}s linear ${index * .18}s infinite` }}>
+                <animateMotion dur={`${2.2 + (index % 3) * .3}s`} begin={`${index * .18}s`} repeatCount="indefinite" path={`M ${from.x} ${from.y} L ${to.x} ${to.y}`}/>
+              </circle>
+            </g>
+          );
+        })}
+      </svg>
+      {visual.nodes.map((node, index) => {
+        const tone = nodeTone(node.tone);
+        return (
+          <div key={node.key} style={{
+            position:'absolute',
+            left:`calc(${node.x}% - 54px)`,
+            top:`calc(${node.y}% - 24px)`,
+            width:108,
+            minHeight:48,
+            padding:'10px 8px',
+            border:`1px solid ${tone.border}`,
+            background:`linear-gradient(180deg, ${tone.bg}, rgba(3,7,18,.92))`,
+            color:tone.color,
+            textAlign:'center',
+            fontSize:12,
+            lineHeight:1.35,
+            boxShadow:`0 14px 32px rgba(0,0,0,.28), 0 0 20px ${tone.bg}`,
+            whiteSpace:'pre-line',
+            transform:'translateZ(28px)',
+            animation:`float3d ${4.8 + (index % 3) * .6}s ease-in-out infinite`,
+          }}>
+            {node.label}
+          </div>
+        );
+      })}
+      <div style={{ position:'absolute', left:18, right:18, bottom:14, padding:'10px 12px', border:'1px solid rgba(159,194,234,.15)', background:'rgba(3,7,18,.45)', color:'#a5c2d8', fontSize:12, lineHeight:1.7 }}>
+        {visual.caption}
+      </div>
+    </div>
+  );
+}
+
 function TopologyPage() {
   const { events } = useLiveFeed();
   const [trafficLogs, setTrafficLogs] = useState([]);
+  const [interfaces, setInterfaces] = useState([]);
+  const [devices, setDevices] = useState([]);
   const [scenarioKey, setScenarioKey] = useState('normal');
   const [guideKey, setGuideKey] = useState('star');
   const scenario = TOPOLOGY_SCENARIOS[scenarioKey];
   const guide = NETWORK_TYPE_GUIDES.find(item => item.key === guideKey) || NETWORK_TYPE_GUIDES[0];
+  const estimatedTopology = estimateTopology(interfaces, devices);
   const nodeMap = Object.fromEntries(TOPOLOGY_NODES.map(node => [node.key, node]));
   const stateStyle = state => ({
     ok: { color:'#6bd214', width:2.2 },
@@ -2764,10 +3247,85 @@ function TopologyPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const loadLocalShape = async () => {
+      try {
+        const [interfacePayload, devicePayload] = await Promise.all([
+          api.getInterfaces(),
+          api.scanNetwork(),
+        ]);
+        if (!active) return;
+        setInterfaces(interfacePayload.interfaces || []);
+        setDevices(devicePayload.devices || []);
+      } catch {
+        if (!active) return;
+        setInterfaces([]);
+        setDevices([]);
+      }
+    };
+    loadLocalShape();
+    return () => { active = false; };
+  }, []);
+
   return (
     <div style={{ animation: 'fadeUp .3s ease', display: 'grid', gap: 14 }}>
-      <Panel title="TARMOQ TOPOLOGIYASI" color="#39ff14">
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <Panel title="HOZIRGI ULANISHINGIZ TAXMINIY TOPOLOGIYASI" color={estimatedTopology.color}>
+          <div className="panel-body" style={{ display:'grid', gap:12 }}>
+            <div style={{ padding:14, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)' }}>
+              <div style={{ color: estimatedTopology.color, fontFamily:'Orbitron,monospace', fontSize:18, marginBottom:6 }}>{estimatedTopology.name}</div>
+              <div style={{ color:'#a5c2d8', fontSize:13, lineHeight:1.8 }}>{estimatedTopology.reason}</div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10 }}>
+              {[
+                ['Interfeyslar', interfaces.length || 0, '#00e5ff'],
+                ['Topilgan qurilmalar', devices.length || 0, '#39ff14'],
+                ['Gatewayli interface', interfaces.filter(item => item.gateway).length || 0, '#ffab00'],
+              ].map(([label, value, tone]) => (
+                <div key={label} style={{ padding:12, border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
+                  <div style={{ color:'#4a6a84', fontSize:10, letterSpacing:2, marginBottom:5 }}>{label}</div>
+                  <div style={{ color:tone, fontFamily:'Orbitron,monospace', fontSize:18 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'grid', gap:8 }}>
+              {interfaces.slice(0, 3).map(item => (
+                <div key={item.name} style={{ padding:'10px 12px', border:'1px solid var(--border2)', background:'rgba(3,7,18,.45)' }}>
+                  <div style={{ color:'#dce8f5', fontSize:12, marginBottom:4 }}>{item.name}</div>
+                  <div style={{ color:'#7ab8d4', fontSize:11, fontFamily:'Share Tech Mono' }}>
+                    {item.ip || '-'} | GW {item.gateway || '-'} | {item.ssid || item.adapter_type || '-'}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ color:'#7ab8d4', fontSize:12, lineHeight:1.7 }}>
+              Bu avtomatik taxmin. Real topologiya managed switch, VLAN, AP controller yoki router ortida murakkabroq bo&apos;lishi mumkin.
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="TOPOLOGY VISUAL LAB" color="#8a7cf5">
+          <div className="panel-body" style={{ display:'grid', gap:12 }}>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {NETWORK_TYPE_GUIDES.map(item => (
+                <button key={item.key} className={`filter-btn${guideKey === item.key ? ' active' : ''}`} onClick={() => setGuideKey(item.key)}>
+                  {item.name}
+                </button>
+              ))}
+            </div>
+            <TopologyVisualPanel guideKey={guideKey}/>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel title="LIVE SECURITY FLOW SCENE" color="#39ff14">
         <div className="panel-body">
+          <div style={{ marginBottom: 14, padding: 12, border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', color:'#a5c2d8', fontSize:13, lineHeight:1.75 }}>
+            Bu sahna aniq fizik topologiyani emas, balki tarmoq ichida threat oqimi qanday harakatlanishini ko&apos;rsatadi:
+            <span style={{ fontFamily:'Share Tech Mono', color:'#dce8f5' }}> attacker to firewall/AI IDS to servislar to ichki segment</span>.
+            Yuqoridagi <span style={{ fontFamily:'Share Tech Mono', color:'#dce8f5' }}>Topology Visual Lab</span> esa sof topologiya turlarini tushuntiradi.
+          </div>
           <div style={{ position: 'relative', minHeight: 430, border: '1px solid var(--border2)', background: 'radial-gradient(circle at top, rgba(17,34,58,.78), rgba(3,7,18,.98))', overflow: 'hidden', perspective: 1200 }}>
             <div style={{ position:'absolute', inset:18, border:'1px solid rgba(0,229,255,.08)', transform:'rotateX(68deg) translateY(135px)', transformStyle:'preserve-3d', boxShadow:'0 0 80px rgba(0,229,255,.04) inset' }}/>
             <div style={{ position:'absolute', inset:'10% 8%', background:'linear-gradient(180deg, rgba(0,229,255,.03), transparent)', transform:'rotateX(62deg) translateY(112px)', transformStyle:'preserve-3d' }}/>
@@ -2835,14 +3393,7 @@ function TopologyPage() {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1.2fr .8fr', gap:12, marginTop: 14 }}>
             <div style={{ border:'1px solid var(--border2)', background:'rgba(13,27,46,.45)', padding:14 }}>
-              <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>TOPOLOGY TYPE GUIDE</div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom: 12 }}>
-                {NETWORK_TYPE_GUIDES.map(item => (
-                  <button key={item.key} className={`filter-btn${guideKey === item.key ? ' active' : ''}`} onClick={() => setGuideKey(item.key)}>
-                    {item.name}
-                  </button>
-                ))}
-              </div>
+              <div style={{ fontSize:10, letterSpacing:2, color:'#4a6a84', marginBottom:10 }}>TANLANGAN TOPOLOGIYA IZOHI</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div>
                   <div style={{ fontSize:18, color:'#dce8f5', fontWeight:700, marginBottom:6 }}>{guide.name}</div>
@@ -2865,7 +3416,7 @@ function TopologyPage() {
                 ['Nodes', Object.keys(nodeMap).length, '#00e5ff'],
                 ['Active links', Object.values(scenario.linkStates).filter(value => value !== 'idle').length, '#39ff14'],
                 ['Threat intensity', scenarioKey === 'attack' ? '92%' : scenarioKey === 'blocked' ? '26%' : '14%', scenarioKey === 'attack' ? '#ff1744' : scenarioKey === 'blocked' ? '#ffab00' : '#9fc2ea'],
-                ['Monitoring mode', guide.name, '#dce8f5'],
+                ['Selected topology', guide.name, '#dce8f5'],
               ].map(([label, value, color]) => (
                 <div key={label} style={{ display:'flex', justifyContent:'space-between', gap:10, padding:'10px 0', borderBottom:'1px solid var(--border2)', fontSize:12 }}>
                   <span style={{ color:'#4a6a84' }}>{label}</span>

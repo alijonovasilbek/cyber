@@ -1,4 +1,7 @@
 from django.utils import timezone
+from pathlib import Path
+
+from django.http import HttpResponse
 from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
@@ -73,6 +76,13 @@ THREAT_TYPE_MAP = {
     'BruteForce': 'brute_force',
     'Normal': 'anomaly',
     'Anomaly': 'anomaly',
+}
+
+
+LOCAL_AGENT_SCRIPT_LABELS = {
+    'install_local_scan_protocol.bat': 'local-agent-install.bat',
+    'start_local_agent.bat': 'local-agent-start.bat',
+    'enable_local_scan.bat': 'local-agent-enable.bat',
 }
 
 
@@ -168,6 +178,67 @@ def scan_local_network(request):
         )
 
     return Response({'devices': devices, 'total': len(devices)})
+
+
+@extend_schema(exclude=True)
+@api_view(['GET'])
+def download_local_agent_script(request, script_name):
+    download_name = LOCAL_AGENT_SCRIPT_LABELS.get(script_name)
+    if not download_name:
+        return Response({'error': 'Script topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / script_name
+    if not script_path.exists():
+        return Response({'error': 'Asosiy script topilmadi.'}, status=status.HTTP_404_NOT_FOUND)
+
+    absolute_script = str(script_path)
+    lines = ['@echo off', 'setlocal']
+
+    if script_name == 'install_local_scan_protocol.bat':
+        lines.extend([
+            f'set "TARGET_SCRIPT={absolute_script}"',
+            'if not exist "%TARGET_SCRIPT%" (',
+            '  echo install_local_scan_protocol.bat topilmadi.',
+            '  exit /b 1',
+            ')',
+            'call "%TARGET_SCRIPT%"',
+        ])
+    elif script_name == 'start_local_agent.bat':
+        lines.extend([
+            f'set "TARGET_SCRIPT={absolute_script}"',
+            'if not exist "%TARGET_SCRIPT%" (',
+            '  echo start_local_agent.bat topilmadi.',
+            '  exit /b 1',
+            ')',
+            'call "%TARGET_SCRIPT%"',
+        ])
+    else:
+        install_script = str(repo_root / 'install_local_scan_protocol.bat')
+        start_script = str(repo_root / 'start_local_agent.bat')
+        lines.extend([
+            f'set "INSTALL_SCRIPT={install_script}"',
+            f'set "START_SCRIPT={start_script}"',
+            'if not exist "%INSTALL_SCRIPT%" (',
+            '  echo install_local_scan_protocol.bat topilmadi.',
+            '  exit /b 1',
+            ')',
+            'if not exist "%START_SCRIPT%" (',
+            '  echo start_local_agent.bat topilmadi.',
+            '  exit /b 1',
+            ')',
+            'echo [1/2] Local scan protocol o\'rnatilmoqda...',
+            'call "%INSTALL_SCRIPT%"',
+            'echo [2/2] Local agent ishga tushirilmoqda...',
+            'call "%START_SCRIPT%"',
+        ])
+
+    lines.append('endlocal')
+    content = '\r\n'.join(lines) + '\r\n'
+
+    response = HttpResponse(content, content_type='application/x-bat')
+    response['Content-Disposition'] = f'attachment; filename="{download_name}"'
+    return response
 
 
 @extend_schema(tags=['Network'], responses=NetworkInterfacesResponseSerializer)

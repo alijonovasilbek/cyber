@@ -22,6 +22,7 @@ urlpatterns = [
     path('network/wifi/status/', views.wifi_status),
     path('network/wifi/connect/', views.wifi_connect),
     path('network/scan/', views.scan_local_network),
+    path('local-agent/download/<str:script_name>/', views.download_local_agent_script),
     path('reputation/<str:ip>/', views.ip_reputation),
     path('', include(router.urls)),
 ]

@@ -175,4 +175,5 @@ export const api = {
   hasLocalAgent,
   launchLocalAgent,
   waitForLocalAgent,
+  getLocalAgentDownloadUrl: scriptName => `${BASE}/local-agent/download/${encodeURIComponent(scriptName)}/`,
 };
