@@ -1,4 +1,6 @@
-﻿import ipaddress
+﻿import csv
+import io
+import ipaddress
 import math
 import re
 import socket
@@ -15,14 +17,20 @@ import requests
 from django.conf import settings
 from django.db.models import Count
 from django.utils import timezone
+from sklearn.cluster import DBSCAN, KMeans
 from sklearn.ensemble import GradientBoostingClassifier, IsolationForest, RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
 
 RISK_LEVEL_MAP = {'unknown': 0.2, 'low': 0.35, 'medium': 0.58, 'high': 0.82, 'critical': 1.0}
+
+_ML_BUNDLE_CACHE: dict = {}
+_AE_CACHE: dict = {}
 COMMON_PORTS = [21, 22, 23, 53, 80, 110, 135, 139, 1433, 3306, 3389, 443, 445, 5432, 5900, 6379, 8080, 8443]
 REMOTE_ADMIN_PORTS = {22, 3389, 5900}
 DATABASE_PORTS = {1433, 3306, 5432, 6379}
@@ -650,6 +658,7 @@ def analyze_threat(ip: str, threat_type: str, algorithms: list, context: str = '
         'context': context,
         'recommendation': recommendation,
         'telemetry': telemetry,
+        'features': features,
         'model_version': 'cyberguard-local-ml-v1',
     }
 
@@ -704,9 +713,26 @@ def _keyword_score(context: str, keywords: list) -> float:
     return min(hits, 4) / 4
 
 
-@lru_cache(maxsize=1)
-def _get_ml_bundle() -> dict:
-    X, y, benign_X = _generate_training_data()
+def _invalidate_ml_cache() -> None:
+    _ML_BUNDLE_CACHE.clear()
+    _AE_CACHE.clear()
+
+
+def _get_ml_bundle(extra_X: np.ndarray = None, extra_y: np.ndarray = None) -> dict:
+    if extra_X is None and 'bundle' in _ML_BUNDLE_CACHE:
+        return _ML_BUNDLE_CACHE['bundle']
+
+    X_syn, y_syn, benign_X = _generate_training_data()
+
+    if extra_X is not None and len(extra_X) >= 5:
+        valid = np.array([lbl in THREAT_ORDER for lbl in extra_y])
+        if valid.sum() >= 5:
+            X = np.vstack([X_syn, extra_X[valid]])
+            y = np.concatenate([y_syn, extra_y[valid]])
+        else:
+            X, y = X_syn, y_syn
+    else:
+        X, y = X_syn, y_syn
 
     rf = RandomForestClassifier(n_estimators=120, max_depth=7, random_state=42)
     gb = GradientBoostingClassifier(random_state=42)
@@ -723,11 +749,14 @@ def _get_ml_bundle() -> dict:
     prototypes = {}
     for threat in THREAT_ORDER:
         mask = y == threat
-        prototypes[threat] = X[mask].mean(axis=0)
+        if mask.sum() > 0:
+            prototypes[threat] = X[mask].mean(axis=0)
+        else:
+            prototypes[threat] = X_syn[y_syn == threat].mean(axis=0)
 
     benign_centroid = benign_X.mean(axis=0)
 
-    return {
+    bundle = {
         'rf': rf,
         'gb': gb,
         'nb': nb,
@@ -736,7 +765,10 @@ def _get_ml_bundle() -> dict:
         'classes': list(rf.classes_),
         'prototypes': prototypes,
         'benign_centroid': benign_centroid,
+        'real_samples': len(extra_X) if extra_X is not None else 0,
     }
+    _ML_BUNDLE_CACHE['bundle'] = bundle
+    return bundle
 
 
 def _generate_training_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -755,6 +787,34 @@ def _generate_training_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
             labels.append(threat)
 
     return np.array(samples, dtype=float), np.array(labels), np.array(benign_samples, dtype=float)
+
+
+def _extract_real_data(min_samples: int = 5):
+    """ThreatLog ma'lumotlaridan real feature vector va labellar chiqaradi."""
+    from .models import ThreatLog
+    logs = ThreatLog.objects.exclude(raw_data={}).order_by('-created_at')[:500]
+    X, y = [], []
+    for log in logs:
+        raw = log.raw_data or {}
+        vec = None
+        feats = raw.get('features')
+        if feats and isinstance(feats, dict) and len(feats) >= len(FEATURE_NAMES) - 2:
+            try:
+                vec = [float(feats.get(n, 0.0)) for n in FEATURE_NAMES]
+            except (TypeError, ValueError):
+                vec = None
+        if vec is None and raw.get('telemetry') and raw.get('ip_info'):
+            try:
+                fvec = _build_feature_vector(raw['ip_info'], raw['telemetry'], raw.get('context', ''))
+                vec = [float(fvec.get(n, 0.0)) for n in FEATURE_NAMES]
+            except Exception:
+                vec = None
+        if vec and log.threat_type in THREAT_ORDER:
+            X.append(vec)
+            y.append(log.threat_type)
+    if len(X) < min_samples:
+        return None, None
+    return np.array(X, dtype=float), np.array(y)
 
 
 def _sample_profile(rng: Random, threat: str | None) -> list[float]:
@@ -992,6 +1052,900 @@ def build_live_logs(limit: int = 10) -> list:
             'ip': log.ip_address,
         })
     return entries
+
+
+# ── MITRE ATT&CK Mapping ──────────────────────────────────────────────────
+
+MITRE_ATTACK = {
+    'ddos': {
+        'technique_id': 'T1498',
+        'technique': 'Network Denial of Service',
+        'tactic': 'Impact',
+        'tactic_id': 'TA0040',
+        'kill_chain_phase': 'Actions on Objectives',
+        'kill_chain_index': 6,
+        'description': 'Tarmoq servisini haddan tashqari so\'rovlar bilan to\'xtatishga urinish.',
+    },
+    'sqli': {
+        'technique_id': 'T1190',
+        'technique': 'Exploit Public-Facing Application',
+        'tactic': 'Initial Access',
+        'tactic_id': 'TA0001',
+        'kill_chain_phase': 'Exploitation',
+        'kill_chain_index': 2,
+        'description': 'Ommaviy ilovadagi zaifliklardan foydalanib tizimga kirish.',
+    },
+    'brute_force': {
+        'technique_id': 'T1110',
+        'technique': 'Brute Force',
+        'tactic': 'Credential Access',
+        'tactic_id': 'TA0006',
+        'kill_chain_phase': 'Exploitation',
+        'kill_chain_index': 2,
+        'description': 'Ko\'p urinishlar orqali parol yoki kalitni topishga harakat qilish.',
+    },
+    'phishing': {
+        'technique_id': 'T1566',
+        'technique': 'Phishing',
+        'tactic': 'Initial Access',
+        'tactic_id': 'TA0001',
+        'kill_chain_phase': 'Delivery',
+        'kill_chain_index': 1,
+        'description': 'Soxta xabarlar orqali foydalanuvchini aldab ma\'lumot olish.',
+    },
+    'ransomware': {
+        'technique_id': 'T1486',
+        'technique': 'Data Encrypted for Impact',
+        'tactic': 'Impact',
+        'tactic_id': 'TA0040',
+        'kill_chain_phase': 'Actions on Objectives',
+        'kill_chain_index': 6,
+        'description': 'Ma\'lumotlarni shifrlash va to\'lov talab qilish.',
+    },
+    'mitm': {
+        'technique_id': 'T1557',
+        'technique': 'Adversary-in-the-Middle',
+        'tactic': 'Collection',
+        'tactic_id': 'TA0009',
+        'kill_chain_phase': 'Exploitation',
+        'kill_chain_index': 2,
+        'description': 'Aloqa orasida turib ma\'lumotlarni tutib olish yoki o\'zgartirish.',
+    },
+    'zero_day': {
+        'technique_id': 'T1203',
+        'technique': 'Exploitation for Client Execution',
+        'tactic': 'Execution',
+        'tactic_id': 'TA0002',
+        'kill_chain_phase': 'Exploitation',
+        'kill_chain_index': 2,
+        'description': 'Noma\'lum zaifliklardan foydalanib kod bajarish.',
+    },
+    'apt': {
+        'technique_id': 'T1021',
+        'technique': 'Remote Services',
+        'tactic': 'Lateral Movement',
+        'tactic_id': 'TA0008',
+        'kill_chain_phase': 'Actions on Objectives',
+        'kill_chain_index': 6,
+        'description': 'Uzoq muddatli yashirin maqsadli hujum kampaniyasi.',
+    },
+    'port_scan': {
+        'technique_id': 'T1046',
+        'technique': 'Network Service Discovery',
+        'tactic': 'Discovery',
+        'tactic_id': 'TA0007',
+        'kill_chain_phase': 'Reconnaissance',
+        'kill_chain_index': 0,
+        'description': 'Ochiq portlarni va servislarni aniqlash uchun tarmoq skanerlash.',
+    },
+}
+
+KILL_CHAIN_PHASES = [
+    {'name': 'Reconnaissance', 'label': 'Razvedka', 'color': '#4a6a84'},
+    {'name': 'Delivery', 'label': 'Yetkazish', 'color': '#ffab00'},
+    {'name': 'Exploitation', 'label': 'Ekspluatatsiya', 'color': '#ff8f00'},
+    {'name': 'Installation', 'label': "O'rnatish", 'color': '#e65100'},
+    {'name': 'Command & Control', 'label': 'C2 Boshqaruv', 'color': '#c62828'},
+    {'name': 'Pivoting', 'label': 'Tarqalish', 'color': '#b71c1c'},
+    {'name': 'Actions on Objectives', 'label': 'Maqsad', 'color': '#ff1744'},
+]
+
+CORRELATION_RULES = [
+    {
+        'name': 'APT Kampaniyasi',
+        'description': 'Brute Force + Port Scan kombinatsiyasi APT hujumiga ishora qilmoqda',
+        'conditions': [
+            {'threat_type': 'brute_force', 'min_count': 2, 'window_minutes': 60},
+            {'threat_type': 'port_scan', 'min_count': 1, 'window_minutes': 60},
+        ],
+        'result_threat': 'apt',
+        'severity': 'critical',
+    },
+    {
+        'name': "Ma'lumot O'g'irlash",
+        'description': "SQL Injection + Phishing kombinatsiyasi ma'lumot chiqarish xavfini ko'rsatmoqda",
+        'conditions': [
+            {'threat_type': 'sqli', 'min_count': 2, 'window_minutes': 120},
+        ],
+        'result_threat': 'apt',
+        'severity': 'high',
+    },
+    {
+        'name': 'Ransomware Tayyorgarligi',
+        'description': "Port Scan + Brute Force kombinatsiyasi ransomware hujumiga tayyorgarlikni ko'rsatadi",
+        'conditions': [
+            {'threat_type': 'port_scan', 'min_count': 1, 'window_minutes': 30},
+            {'threat_type': 'brute_force', 'min_count': 1, 'window_minutes': 30},
+        ],
+        'result_threat': 'ransomware',
+        'severity': 'critical',
+    },
+    {
+        'name': 'DDoS Botnet',
+        'description': "Ko'p sonli DDoS urinishlari tashkiliy botnet hujumiga ishora",
+        'conditions': [
+            {'threat_type': 'ddos', 'min_count': 3, 'window_minutes': 15},
+        ],
+        'result_threat': 'ddos',
+        'severity': 'critical',
+    },
+]
+
+
+def get_model_performance() -> dict:
+    """Real ThreatLog yoki sintetik test data bilan algoritmlarni baholaydi."""
+    from collections import Counter
+    bundle = _get_ml_bundle()
+
+    X_real, y_real = _extract_real_data(min_samples=10)
+    if X_real is not None and len(X_real) >= 10:
+        test_X_arr = X_real
+        test_y_arr = y_real
+        data_source = 'real'
+        real_samples = len(y_real)
+        real_dist = dict(Counter(y_real.tolist()))
+    else:
+        rng = Random(99)
+        test_X, test_y_list = [], []
+        for threat in THREAT_ORDER:
+            for _ in range(30):
+                test_X.append(_sample_profile(rng, threat))
+                test_y_list.append(threat)
+        test_X_arr = np.array(test_X, dtype=float)
+        test_y_arr = np.array(test_y_list)
+        data_source = 'synthetic'
+        real_samples = 0
+        real_dist = {}
+
+    algo_map = [
+        ('Random Forest', 'rf'),
+        ('XGBoost', 'gb'),
+        ('Naive Bayes', 'nb'),
+        ('SVM', 'svm'),
+    ]
+
+    results = {}
+    for algo_name, model_key in algo_map:
+        model = bundle[model_key]
+        y_pred = model.predict(test_X_arr)
+        results[algo_name] = {
+            'accuracy': round(float(accuracy_score(test_y_arr, y_pred)) * 100, 1),
+            'precision': round(float(precision_score(test_y_arr, y_pred, average='weighted', zero_division=0)) * 100, 1),
+            'recall': round(float(recall_score(test_y_arr, y_pred, average='weighted', zero_division=0)) * 100, 1),
+            'f1': round(float(f1_score(test_y_arr, y_pred, average='weighted', zero_division=0)) * 100, 1),
+        }
+
+    rf_pred = bundle['rf'].predict(test_X_arr)
+    cm_labels = [t for t in THREAT_ORDER if t in test_y_arr]
+    cm = confusion_matrix(test_y_arr, rf_pred, labels=cm_labels)
+
+    per_class = {}
+    for threat in cm_labels:
+        per_class[threat] = {}
+        for algo_name, model_key in algo_map:
+            y_pred = bundle[model_key].predict(test_X_arr)
+            mask = test_y_arr == threat
+            if mask.sum() > 0:
+                tp = int(((y_pred == threat) & mask).sum())
+                fp = int(((y_pred == threat) & ~mask).sum())
+                fn = int(((y_pred != threat) & mask).sum())
+                p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+                r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+                per_class[threat][algo_name] = round(2 * p * r / (p + r) * 100, 1) if (p + r) > 0 else 0.0
+
+    return {
+        'algorithms': results,
+        'confusion_matrix': {'labels': cm_labels, 'matrix': cm.tolist()},
+        'per_class_f1': per_class,
+        'test_samples': len(test_y_arr),
+        'real_samples': real_samples,
+        'data_source': data_source,
+        'real_distribution': real_dist,
+    }
+
+
+def get_feature_attribution(feature_array: np.ndarray, threat_type: str) -> dict:
+    """Har bir xususiyatning tahdid ehtimollikka ta'sirini hisoblaydi (ablation-based)."""
+    bundle = _get_ml_bundle()
+    rf = bundle['rf']
+    class_index = bundle['classes'].index(threat_type)
+
+    baseline_prob = float(rf.predict_proba([feature_array])[0][class_index])
+
+    contributions = {}
+    for i, fname in enumerate(FEATURE_NAMES):
+        perturbed = feature_array.copy()
+        perturbed[i] = 0.0
+        perturbed_prob = float(rf.predict_proba([perturbed])[0][class_index])
+        contributions[fname] = round(baseline_prob - perturbed_prob, 4)
+
+    sorted_items = sorted(contributions.items(), key=lambda x: abs(x[1]), reverse=True)
+
+    global_importance = {
+        name: round(float(val), 4)
+        for name, val in zip(FEATURE_NAMES, rf.feature_importances_)
+    }
+    global_sorted = sorted(global_importance.items(), key=lambda x: -x[1])
+
+    return {
+        'baseline_probability': round(baseline_prob, 3),
+        'threat_type': threat_type,
+        'feature_contributions': [{'feature': k, 'value': v} for k, v in sorted_items[:12]],
+        'global_importance': [{'feature': k, 'value': v} for k, v in global_sorted[:12]],
+        'top_positive': [{'feature': k, 'value': v} for k, v in sorted_items if v > 0][:5],
+        'top_negative': [{'feature': k, 'value': v} for k, v in sorted_items if v < 0][:5],
+    }
+
+
+def get_threat_timeline(days: int = 7) -> dict:
+    """Har 4 soatlik interval bo'yicha tahdid turlarini qaytaradi."""
+    from .models import ThreatLog
+
+    now = timezone.now()
+    slots = days * 6
+    timeline = []
+
+    for slot_i in range(slots, 0, -1):
+        slot_start = now - timezone.timedelta(hours=slot_i * 4)
+        slot_end = slot_start + timezone.timedelta(hours=4)
+        slot_logs = ThreatLog.objects.filter(created_at__gte=slot_start, created_at__lt=slot_end)
+
+        entry = {
+            'timestamp': slot_start.isoformat(),
+            'label': slot_start.strftime('%m/%d %H:00'),
+            'total': slot_logs.count(),
+        }
+        for threat in THREAT_ORDER:
+            entry[threat] = slot_logs.filter(threat_type=threat).count()
+        timeline.append(entry)
+
+    threat_totals = {}
+    for threat in THREAT_ORDER:
+        threat_totals[threat] = ThreatLog.objects.filter(threat_type=threat).count()
+
+    return {
+        'timeline': timeline,
+        'threat_types': THREAT_ORDER,
+        'threat_totals': threat_totals,
+    }
+
+
+def get_heatmap_data() -> dict:
+    """Subnet va port bo'yicha tahdid zichligini qaytaradi."""
+    from .models import ThreatLog, IPAnalysisRecord
+
+    subnet_data = {}
+    for log in ThreatLog.objects.values('ip_address', 'severity', 'threat_type'):
+        ip = log['ip_address']
+        parts = ip.split('.')
+        if len(parts) == 4:
+            subnet = f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
+            if subnet not in subnet_data:
+                subnet_data[subnet] = {'count': 0, 'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
+            subnet_data[subnet]['count'] += 1
+            sev = log['severity']
+            if sev in subnet_data[subnet]:
+                subnet_data[subnet][sev] += 1
+
+    port_labels = {
+        21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
+        80: 'HTTP', 110: 'POP3', 135: 'RPC', 139: 'NetBIOS',
+        143: 'IMAP', 443: 'HTTPS', 445: 'SMB', 1433: 'MSSQL',
+        3306: 'MySQL', 3389: 'RDP', 5432: 'PostgreSQL', 8080: 'HTTP-Alt',
+    }
+    port_data = {str(p): {'count': 0, 'high_threat': 0, 'label': lbl} for p, lbl in port_labels.items()}
+
+    for record in IPAnalysisRecord.objects.values('open_ports', 'threat_level'):
+        for port in (record.get('open_ports') or []):
+            key = str(port)
+            if key in port_data:
+                port_data[key]['count'] += 1
+                if record['threat_level'] in ('high', 'critical'):
+                    port_data[key]['high_threat'] += 1
+
+    threat_dist = dict(
+        ThreatLog.objects.values('threat_type').annotate(c=Count('id')).values_list('threat_type', 'c')
+    )
+
+    return {
+        'subnets': subnet_data,
+        'ports': {k: v for k, v in port_data.items() if v['count'] > 0},
+        'all_ports': port_data,
+        'threat_distribution': threat_dist,
+    }
+
+
+def get_mitre_info(threat_type: str) -> dict:
+    """Tahdid turi uchun MITRE ATT&CK va Kill Chain ma'lumotini qaytaradi."""
+    info = MITRE_ATTACK.get(threat_type, {})
+    if not info:
+        return {'error': f'MITRE mapping topilmadi: {threat_type}'}
+    return {
+        **info,
+        'kill_chain_phases': KILL_CHAIN_PHASES,
+        'threat_type': threat_type,
+        'threat_name': THREAT_SIGNATURES.get(threat_type, {}).get('name', threat_type),
+    }
+
+
+def get_all_mitre_mappings() -> list:
+    """Barcha tahdid turlari uchun MITRE ma'lumotini qaytaradi."""
+    result = []
+    for threat_type in THREAT_ORDER:
+        info = MITRE_ATTACK.get(threat_type, {})
+        sig = THREAT_SIGNATURES.get(threat_type, {})
+        result.append({
+            'threat_type': threat_type,
+            'threat_name': sig.get('name', threat_type),
+            'severity': sig.get('severity', 'medium'),
+            **info,
+        })
+    return result
+
+
+def run_correlation_engine() -> list:
+    """Korrelyatsiya qoidalari asosida yangi intsidentlarni aniqlaydi va saqlaydi."""
+    from .models import ThreatLog, Incident
+
+    now = timezone.now()
+    new_incidents = []
+
+    for rule in CORRELATION_RULES:
+        max_window = max(c['window_minutes'] for c in rule['conditions'])
+        all_met = True
+        involved_ips = set()
+
+        for condition in rule['conditions']:
+            window_start = now - timezone.timedelta(minutes=condition['window_minutes'])
+            logs = ThreatLog.objects.filter(threat_type=condition['threat_type'], created_at__gte=window_start)
+            if logs.count() < condition['min_count']:
+                all_met = False
+                break
+            for log in logs.values('ip_address'):
+                involved_ips.add(log['ip_address'])
+
+        if not all_met:
+            continue
+
+        already_exists = Incident.objects.filter(
+            rule_name=rule['name'],
+            created_at__gte=now - timezone.timedelta(hours=2),
+        ).exists()
+
+        if already_exists:
+            continue
+
+        incident = Incident.objects.create(
+            title=rule['name'],
+            description=rule['description'],
+            rule_name=rule['name'],
+            severity=rule['severity'],
+            threat_type=rule['result_threat'],
+            involved_ips=list(involved_ips)[:20],
+        )
+        new_incidents.append({
+            'id': incident.id,
+            'title': incident.title,
+            'description': incident.description,
+            'severity': incident.severity,
+            'threat_type': incident.threat_type,
+            'involved_ips': incident.involved_ips,
+            'created_at': incident.created_at.isoformat(),
+        })
+
+    return new_incidents
+
+
+def get_incidents() -> list:
+    """Barcha intsidentlarni qaytaradi."""
+    from .models import Incident
+    return [
+        {
+            'id': inc.id,
+            'title': inc.title,
+            'description': inc.description,
+            'severity': inc.severity,
+            'threat_type': inc.threat_type,
+            'involved_ips': inc.involved_ips,
+            'is_resolved': inc.is_resolved,
+            'created_at': inc.created_at.isoformat(),
+        }
+        for inc in Incident.objects.order_by('-created_at')[:50]
+    ]
+
+
+def cluster_threats() -> dict:
+    """Real ThreatLog va IPAnalysisRecord ma'lumotlari asosida klasterlash."""
+    from .models import ThreatLog, IPAnalysisRecord
+
+    X_list, labels_true, sources = [], [], []
+
+    # 1) ThreatLog dan to'liq feature vector
+    for log in ThreatLog.objects.order_by('-created_at')[:300]:
+        raw = log.raw_data or {}
+        vec = None
+        feats = raw.get('features')
+        if feats and isinstance(feats, dict):
+            try:
+                vec = [float(feats.get(n, 0.0)) for n in FEATURE_NAMES]
+            except (TypeError, ValueError):
+                vec = None
+        if vec is None and raw.get('telemetry') and raw.get('ip_info'):
+            try:
+                fvec = _build_feature_vector(raw['ip_info'], raw['telemetry'], raw.get('context', ''))
+                vec = [float(fvec.get(n, 0.0)) for n in FEATURE_NAMES]
+            except Exception:
+                vec = None
+        if vec is None:
+            sev_map = {'low': 0.1, 'medium': 0.4, 'high': 0.7, 'critical': 1.0}
+            vec = [0.0] * len(FEATURE_NAMES)
+            vec[0] = 1.0 if log.is_local else 0.0
+            vec[2] = sev_map.get(log.severity, 0.1)
+            vec[8] = float(log.probability or 0.0)
+        X_list.append(vec)
+        labels_true.append(log.threat_type if log.threat_type in THREAT_ORDER else 'port_scan')
+        sources.append('threat_log')
+
+    # 2) IPAnalysisRecord dan port scan ma'lumotlari
+    for rec in IPAnalysisRecord.objects.exclude(open_ports=[]).order_by('-created_at')[:200]:
+        ports = rec.open_ports or []
+        risky = len([p for p in ports if p in RISKY_PORTS])
+        web = len([p for p in ports if p in WEB_PORTS])
+        db = len([p for p in ports if p in DATABASE_PORTS])
+        vec = [0.0] * len(FEATURE_NAMES)
+        vec[2] = RISK_LEVEL_MAP.get(rec.threat_level, 0.2)
+        vec[3] = min(len(ports), 12) / 12
+        vec[4] = min(risky, 8) / 8
+        vec[5] = min(web, 4) / 4
+        vec[6] = min(db, 4) / 4
+        vec[7] = 1.0 if any(p in REMOTE_ADMIN_PORTS for p in ports) else 0.0
+        lbl = rec.attack_type if rec.attack_type in THREAT_ORDER else 'port_scan'
+        X_list.append(vec)
+        labels_true.append(lbl)
+        sources.append('scan_record')
+
+    if len(X_list) < 5:
+        return {
+            'error': "Yetarli ma'lumot yo'q",
+            'detail': "Avval IP Tahlil sahifasida bir nechta IP tahlil qiling yoki tarmoq skanini bajaring.",
+            'n_samples': len(X_list),
+        }
+
+    X = np.array(X_list, dtype=float)
+    n_clusters = min(len(THREAT_ORDER), max(3, len(X) // 15))
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    kmeans_labels = kmeans.fit_predict(X).tolist()
+
+    dbscan = DBSCAN(eps=0.25, min_samples=3)
+    dbscan_labels = dbscan.fit_predict(X).tolist()
+
+    clusters = {}
+    for i, km_label in enumerate(kmeans_labels):
+        key = f'cluster_{km_label}'
+        if key not in clusters:
+            clusters[key] = {'id': km_label, 'members': 0, 'threat_types': {}, 'anomaly_count': 0}
+        clusters[key]['members'] += 1
+        threat = labels_true[i]
+        clusters[key]['threat_types'][threat] = clusters[key]['threat_types'].get(threat, 0) + 1
+        if dbscan_labels[i] == -1:
+            clusters[key]['anomaly_count'] += 1
+
+    src_counts: dict = {}
+    for s in sources:
+        src_counts[s] = src_counts.get(s, 0) + 1
+
+    return {
+        'n_samples': len(X),
+        'n_kmeans_clusters': n_clusters,
+        'n_dbscan_clusters': len(set(l for l in dbscan_labels if l >= 0)),
+        'dbscan_noise_count': dbscan_labels.count(-1),
+        'clusters': list(clusters.values()),
+        'sources': src_counts,
+        'points': [
+            {'x': float(X[i][3]), 'y': float(X[i][8]), 'z': float(X[i][2]),
+             'kmeans': kmeans_labels[i], 'dbscan': dbscan_labels[i],
+             'threat': labels_true[i], 'source': sources[i]}
+            for i in range(min(len(X), 100))
+        ],
+    }
+
+
+def _get_autoencoder() -> MLPRegressor:
+    """Real + sintetik data bilan o'qitilgan autoencoder (bottleneck arxitektura)."""
+    if 'ae' in _AE_CACHE:
+        return _AE_CACHE['ae']
+
+    X_syn, _, benign_X = _generate_training_data()
+    X_real, _ = _extract_real_data(min_samples=5)
+    all_X = np.vstack([X_syn, benign_X, X_real]) if X_real is not None else np.vstack([X_syn, benign_X])
+
+    ae = MLPRegressor(
+        hidden_layer_sizes=(14, 6, 14),
+        activation='relu',
+        max_iter=300,
+        random_state=42,
+        alpha=0.001,
+    )
+    ae.fit(all_X, all_X)
+
+    reconstructed = ae.predict(all_X)
+    errors = np.mean((all_X - reconstructed) ** 2, axis=1)
+    threshold = float(np.percentile(errors, 95))
+    _AE_CACHE['ae'] = ae
+    _AE_CACHE['threshold'] = max(threshold, 0.02)
+    _AE_CACHE['real_samples'] = len(X_real) if X_real is not None else 0
+    return ae
+
+
+def get_autoencoder_score(feature_array: np.ndarray) -> dict:
+    """Autoencoder reconstruction error asosida anomaliya skorini qaytaradi."""
+    ae = _get_autoencoder()
+    threshold = _AE_CACHE.get('threshold', 0.12)
+    reconstructed = ae.predict([feature_array])[0]
+    errors = (feature_array - reconstructed) ** 2
+    reconstruction_error = float(np.mean(errors))
+    anomaly_score = min(reconstruction_error / threshold, 1.0)
+    is_anomaly = anomaly_score > 0.6
+
+    feature_errors = {
+        name: round(float(errors[i]), 5)
+        for i, name in enumerate(FEATURE_NAMES)
+    }
+    top_errors = sorted(feature_errors.items(), key=lambda x: -x[1])[:8]
+
+    return {
+        'reconstruction_error': round(reconstruction_error, 5),
+        'anomaly_score': round(anomaly_score, 3),
+        'anomaly_pct': f'{round(anomaly_score * 100, 1)}%',
+        'is_anomaly': is_anomaly,
+        'threshold': round(threshold, 5),
+        'real_samples_trained': _AE_CACHE.get('real_samples', 0),
+        'label': 'Anomaliya aniqlandi — Zero-Day ehtimoli yuqori' if is_anomaly else "Normal pattern — ma'lum tahdid profili bilan mos",
+        'top_error_features': [{'feature': k, 'error': v} for k, v in top_errors],
+        'feature_errors': feature_errors,
+    }
+
+
+def export_threats_csv() -> str:
+    """ThreatLog yozuvlarini CSV formatda qaytaradi."""
+    from .models import ThreatLog
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'IP Manzil', 'Tahdid Turi', 'Jiddiylik', 'Ehtimollik', 'Qurilma', 'Algoritm', 'Bloklangan', 'Sana'])
+
+    for log in ThreatLog.objects.order_by('-created_at')[:500]:
+        writer.writerow([
+            log.id,
+            log.ip_address,
+            log.threat_type,
+            log.severity,
+            round(log.probability, 3),
+            log.device_name,
+            log.algorithm,
+            'Ha' if log.is_blocked else "Yo'q",
+            log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        ])
+
+    return output.getvalue()
+
+
+def export_threats_json() -> list:
+    """ThreatLog yozuvlarini JSON formatda qaytaradi."""
+    from .models import ThreatLog
+
+    return [
+        {
+            'id': log.id,
+            'ip_address': log.ip_address,
+            'threat_type': log.threat_type,
+            'severity': log.severity,
+            'probability': round(log.probability, 3),
+            'device_name': log.device_name,
+            'algorithm': log.algorithm,
+            'is_blocked': log.is_blocked,
+            'created_at': log.created_at.isoformat(),
+        }
+        for log in ThreatLog.objects.order_by('-created_at')[:500]
+    ]
+
+
+def generate_pdf_report() -> bytes:
+    """Tahdid hisobotini PDF formatida yaratadi."""
+    from .models import ThreatLog, BlockedIP, Incident
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import cm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError:
+        return b''
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2 * cm, bottomMargin=2 * cm)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph('CyberGuard AI — Tahdid Tahlili Hisoboti', styles['Title']))
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph(f"Sana: {timezone.now().strftime('%Y-%m-%d %H:%M')} UTC", styles['Normal']))
+    story.append(Spacer(1, 0.6 * cm))
+
+    logs = ThreatLog.objects.order_by('-created_at')[:20]
+    total = ThreatLog.objects.count()
+    blocked_count = BlockedIP.objects.filter(is_active=True).count()
+    critical_count = ThreatLog.objects.filter(severity='critical').count()
+    incident_count = Incident.objects.count()
+
+    story.append(Paragraph('Umumiy Ko\'rsatkichlar', styles['Heading2']))
+    summary_data = [
+        ['Ko\'rsatkich', 'Qiymat'],
+        ['Jami tahdidlar', str(total)],
+        ['Bloklangan IP lar', str(blocked_count)],
+        ['Kritik tahdidlar', str(critical_count)],
+        ['Intsidentlar', str(incident_count)],
+    ]
+    summary_table = Table(summary_data, colWidths=[10 * cm, 6 * cm])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a3a5c')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f0f4f8'), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#c8d6e0')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 0.6 * cm))
+
+    story.append(Paragraph('So\'nggi 20 ta Tahdid', styles['Heading2']))
+    log_data = [['IP', 'Tahdid', 'Jiddiylik', 'Ehtimol', 'Sana']]
+    for log in logs:
+        log_data.append([
+            log.ip_address,
+            log.threat_type.upper(),
+            log.severity.upper(),
+            f'{round(log.probability * 100, 1)}%',
+            log.created_at.strftime('%m/%d %H:%M'),
+        ])
+    log_table = Table(log_data, colWidths=[4 * cm, 3.5 * cm, 3 * cm, 2.5 * cm, 3.5 * cm])
+    log_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a3a5c')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f0f4f8'), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#c8d6e0')),
+        ('PADDING', (0, 0), (-1, -1), 5),
+    ]))
+    story.append(log_table)
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
+def retrain_models_from_csv_rows(rows: list, label_col: str = None) -> dict:
+    """CSV satrlaridan feature vector yaratib modellarni qayta o'qitadi."""
+    from collections import Counter
+
+    LABEL_MAP = {
+        'normal': None, 'benign': None,
+        'dos': 'ddos', 'ddos': 'ddos',
+        'sql injection': 'sqli', 'sqli': 'sqli', 'web attacks': 'sqli',
+        'brute force': 'brute_force', 'bruteforce': 'brute_force',
+        'ftp-patator': 'brute_force', 'ssh-patator': 'brute_force',
+        'phishing': 'phishing', 'spam': 'phishing',
+        'ransomware': 'ransomware',
+        'mitm': 'mitm', 'arp spoofing': 'mitm',
+        'zero-day': 'zero_day', 'zeroday': 'zero_day',
+        'apt': 'apt', 'infiltration': 'apt',
+        'port scan': 'port_scan', 'portscan': 'port_scan', 'probe': 'port_scan',
+    }
+
+    if not rows:
+        return {'error': "Ma'lumot yo'q"}
+
+    all_cols = list(rows[0].keys())
+    candidate_labels = ['label', 'class', 'attack_type', 'category', 'target', 'Label', 'Class']
+    if label_col:
+        candidate_labels.insert(0, label_col)
+    found_label_col = next((c for c in candidate_labels if c in all_cols), None)
+    if not found_label_col:
+        return {'error': f"Label ustuni topilmadi. Ustunlar: {', '.join(all_cols[:10])}"}
+
+    num_cols = []
+    for col in all_cols:
+        if col == found_label_col:
+            continue
+        try:
+            vals = [float(row[col]) for row in rows[:20] if row.get(col) not in ('', None)]
+            if vals:
+                num_cols.append(col)
+        except (ValueError, TypeError):
+            continue
+
+    if len(num_cols) < 3:
+        return {'error': f"Yetarli raqamli ustun yo'q ({len(num_cols)} ta topildi)"}
+
+    X_csv, y_csv = [], []
+    for row in rows:
+        raw_lbl = str(row.get(found_label_col, '')).strip().lower()
+        mapped = None
+        for k, v in LABEL_MAP.items():
+            if k in raw_lbl or raw_lbl == k:
+                mapped = v
+                break
+        if mapped is None:
+            for t in THREAT_ORDER:
+                if t in raw_lbl:
+                    mapped = t
+                    break
+        if mapped is None:
+            continue
+        try:
+            vals = [float(row.get(c, 0) or 0) for c in num_cols[:20]]
+            X_csv.append(vals)
+            y_csv.append(mapped)
+        except (ValueError, TypeError):
+            continue
+
+    if len(X_csv) < 10:
+        sample_labels = list(set(str(r.get(found_label_col, '')) for r in rows[:30]))
+        return {'error': f"Mos tahdid qatori yetarli emas ({len(X_csv)} ta). Namuna labellar: {sample_labels[:10]}"}
+
+    target_len = len(FEATURE_NAMES)
+    X_padded = []
+    for vec in X_csv:
+        if len(vec) >= target_len:
+            X_padded.append(vec[:target_len])
+        else:
+            X_padded.append(vec + [0.0] * (target_len - len(vec)))
+
+    X_arr = np.array(X_padded, dtype=float)
+    col_max = X_arr.max(axis=0)
+    col_max[col_max == 0] = 1.0
+    X_norm = X_arr / col_max
+    y_arr = np.array(y_csv)
+
+    _invalidate_ml_cache()
+    try:
+        _get_ml_bundle(extra_X=X_norm, extra_y=y_arr)
+    except Exception as e:
+        return {'error': f"Model o'qitishda xato: {str(e)}"}
+
+    dist = dict(Counter(y_csv))
+    return {
+        'success': True,
+        'csv_samples_used': len(X_csv),
+        'distribution': dist,
+        'message': f"{len(X_csv)} ta real namuna bilan modellar qayta o'qitildi",
+    }
+
+
+def generate_sample_dataset(fmt: str) -> str:
+    """Namuna CSV dataset generatsiya qiladi (o'qitish va sinov uchun)."""
+    from random import Random as _R
+    rng = _R(777)
+    out = io.StringIO()
+
+    if fmt == 'cyberguard':
+        # CyberGuard Native: to'liq 20 ta feature + label
+        writer = csv.writer(out)
+        header = list(FEATURE_NAMES) + ['label']
+        writer.writerow(header)
+        PROFILES = {
+            'ddos':        {'open_port_count': (0.35, 0.9), 'web_port_count': (0.45, 1.0), 'abuse_score': (0.45, 0.95), 'reports': (0.35, 1.0), 'ddos_kw': (0.55, 1.0)},
+            'sqli':        {'web_port_count': (0.4, 1.0), 'db_port_count': (0.35, 0.9), 'sqli_kw': (0.65, 1.0)},
+            'brute_force': {'risky_port_count': (0.25, 0.7), 'remote_admin': (0.8, 1.0), 'brute_force_kw': (0.6, 1.0)},
+            'phishing':    {'web_port_count': (0.25, 0.75), 'abuse_score': (0.15, 0.7), 'phishing_kw': (0.65, 1.0)},
+            'ransomware':  {'known_risk': (0.55, 1.0), 'risky_port_count': (0.2, 0.65), 'ransomware_kw': (0.65, 1.0)},
+            'mitm':        {'remote_admin': (0.5, 1.0), 'mitm_kw': (0.65, 1.0)},
+            'zero_day':    {'known_risk': (0.45, 1.0), 'abuse_score': (0.2, 0.8), 'zero_day_kw': (0.7, 1.0)},
+            'apt':         {'known_risk': (0.45, 1.0), 'context_intensity': (0.5, 1.0), 'apt_kw': (0.7, 1.0)},
+            'port_scan':   {'open_port_count': (0.45, 1.0), 'risky_port_count': (0.25, 0.9), 'port_scan_kw': (0.65, 1.0)},
+        }
+        for threat, overrides in PROFILES.items():
+            for _ in range(40):
+                row = {n: round(rng.uniform(0.0, 0.2), 4) for n in FEATURE_NAMES}
+                for k, (lo, hi) in overrides.items():
+                    row[k] = round(rng.uniform(lo, hi), 4)
+                writer.writerow([row[n] for n in FEATURE_NAMES] + [threat])
+        for _ in range(30):
+            writer.writerow([round(rng.uniform(0.0, 0.15), 4) for _ in FEATURE_NAMES] + ['port_scan'])
+
+    elif fmt == 'nsl_kdd':
+        # NSL-KDD uslubi: 12 numeric feature + label
+        cols = ['duration', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment',
+                'urgent', 'hot', 'num_failed_logins', 'logged_in',
+                'num_compromised', 'root_shell', 'su_attempted', 'label']
+        writer = csv.writer(out)
+        writer.writerow(cols)
+        LABEL_MAP = {
+            'normal': [0, 200, 150, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            'dos':    [0, 5000, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            'brute_force': [2, 500, 200, 0, 0, 0, 2, 5, 0, 0, 0, 0],
+            'port_scan': [0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            'apt':    [120, 800, 600, 0, 0, 0, 5, 1, 1, 3, 1, 0],
+        }
+        for label, base in LABEL_MAP.items():
+            for _ in range(40):
+                row = [max(0, int(v * rng.uniform(0.5, 1.8))) for v in base]
+                writer.writerow(row + [label])
+
+    elif fmt == 'cicids2017':
+        # CICIDS2017 uslubi: 10 network flow feature + Label
+        cols = ['Flow Duration', 'Total Fwd Packets', 'Total Bwd Packets',
+                'Total Length Fwd', 'Total Length Bwd', 'Fwd Packet Length Max',
+                'Bwd Packet Length Mean', 'Flow Bytes/s', 'Flow Packets/s',
+                'Avg Packet Size', 'Label']
+        writer = csv.writer(out)
+        writer.writerow(cols)
+        CICIDS_MAP = {
+            'BENIGN':       [50000, 10, 8, 1200, 800, 1460, 100, 200, 0.5, 120],
+            'DDoS':         [1000, 500, 2, 50000, 100, 60, 50, 50000, 500, 60],
+            'DoS Hulk':     [2000, 200, 5, 20000, 500, 200, 100, 10000, 100, 100],
+            'FTP-Patator':  [30000, 20, 15, 2000, 1500, 800, 750, 100, 0.5, 750],
+            'SSH-Patator':  [40000, 25, 20, 2500, 2000, 900, 800, 100, 0.5, 850],
+            'PortScan':     [500, 2, 1, 120, 60, 60, 60, 200, 4, 60],
+            'Web Attack – Sql Injection': [5000, 15, 12, 3000, 2500, 1460, 1200, 500, 3, 1300],
+        }
+        for label, base in CICIDS_MAP.items():
+            for _ in range(30):
+                row = [max(0, int(v * rng.uniform(0.6, 1.6))) for v in base]
+                writer.writerow(row + [label])
+
+    return out.getvalue()
+
+
+SAMPLE_DATASETS = [
+    {
+        'id': 'cyberguard',
+        'name': 'CyberGuard Native',
+        'desc': "CyberGuard 20 ta feature bilan to'liq mos. Eng tez o'qitiladi.",
+        'rows': 390,
+        'features': 20,
+        'labels': 'ddos, sqli, brute_force, phishing, ransomware, mitm, zero_day, apt, port_scan',
+        'color': '#39ff14',
+    },
+    {
+        'id': 'nsl_kdd',
+        'name': 'NSL-KDD Style',
+        'desc': 'Klassik IDS dataset formati. 12 numeric feature.',
+        'rows': 200,
+        'features': 12,
+        'labels': 'normal, dos, brute_force, port_scan, apt',
+        'color': '#00e5ff',
+    },
+    {
+        'id': 'cicids2017',
+        'name': 'CICIDS2017 Style',
+        'desc': 'Tarmoq oqimi dataset. 10 flow feature.',
+        'rows': 210,
+        'features': 10,
+        'labels': 'BENIGN, DDoS, DoS Hulk, FTP-Patator, SSH-Patator, PortScan, SQL Injection',
+        'color': '#a855f7',
+    },
+]
 
 
 def get_dashboard_stats(logs) -> dict:

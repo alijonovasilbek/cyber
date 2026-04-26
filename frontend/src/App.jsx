@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from './services/api';
 
 function safeStorageGet(key, fallback = '') {
@@ -3822,13 +3822,17 @@ function AILabPage() {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadName, setUploadName] = useState('');
   const [uploadFormat, setUploadFormat] = useState('custom');
+  const [sampleDatasets, setSampleDatasets] = useState([]);
 
   const accent = themeAccent('cyan', '#00e5ff');
 
   useEffect(() => {
     if (tab === 'performance' && !perfData) loadPerf();
     if (tab === 'clustering' && !clusterData) loadCluster();
-    if (tab === 'dataset') api.getDatasets().then(setDatasets).catch(() => {});
+    if (tab === 'dataset') {
+      api.getDatasets().then(setDatasets).catch(() => {});
+      if (!sampleDatasets.length) api.getSampleDatasets().then(d => setSampleDatasets(d.samples || [])).catch(() => {});
+    }
   }, [tab]);
 
   const loadPerf = async () => {
@@ -3871,7 +3875,13 @@ function AILabPage() {
       fd.append('name', uploadName || uploadFile.name);
       fd.append('format_type', uploadFormat);
       const res = await api.uploadDataset(fd);
-      setUploadMsg(res.message || 'Yuklandi');
+      if (res.trained) {
+        const dist = res.retrain?.distribution || {};
+        const distStr = Object.entries(dist).map(([k,v]) => `${k}:${v}`).join(', ');
+        setUploadMsg(`✓ ${res.message}\nTaqsimot: ${distStr}`);
+      } else {
+        setUploadMsg((res.message || 'Yuklandi') + (res.retrain?.error ? `\n⚠ Model o'qitmadi: ${res.retrain.error}` : ''));
+      }
       api.getDatasets().then(setDatasets).catch(() => {});
     } catch (e) { setUploadMsg('Xato: ' + e.message); }
     setUploadLoading(false);
@@ -3910,6 +3920,11 @@ function AILabPage() {
           {perfLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>}
           {perfData && !perfData.error && (
             <>
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: perfData.data_source === 'real' ? 'rgba(57,255,20,.08)' : 'rgba(255,171,0,.08)', border: `1px solid ${perfData.data_source === 'real' ? '#39ff1444' : '#ffab0044'}`, fontFamily: 'Share Tech Mono', fontSize: 11, color: perfData.data_source === 'real' ? '#39ff14' : '#ffab00' }}>
+                {perfData.data_source === 'real'
+                  ? `✓ REAL DATA: ${perfData.real_samples} ta haqiqiy IP tahlil natijasi asosida baholandi`
+                  : `⚠ SINTETIK DATA: Hali haqiqiy tahlil yo'q — IP Tahlil sahifasida kamida 10 ta IP tahlil qiling`}
+              </div>
               <Panel title="ALGORITMLAR — ANIQLIK METRIKALAR" color={accent}>
                 <div className="panel-body" style={{ overflowX: 'auto' }}>
                   <table className="alerts-table">
@@ -4099,7 +4114,11 @@ function AILabPage() {
           </Panel>
 
           {aeData && !aeData.error && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+            <div style={{ marginTop: 14 }}>
+              <div style={{ marginBottom: 10, padding: '7px 12px', fontFamily: 'Share Tech Mono', fontSize: 11, background: aeData.real_samples_trained > 0 ? 'rgba(57,255,20,.07)' : 'rgba(255,171,0,.07)', border: `1px solid ${aeData.real_samples_trained > 0 ? '#39ff1444' : '#ffab0044'}`, color: aeData.real_samples_trained > 0 ? '#39ff14' : '#ffab00' }}>
+                {aeData.real_samples_trained > 0 ? `✓ Real data: ${aeData.real_samples_trained} ta haqiqiy namuna bilan o'qitilgan | Threshold: ${aeData.threshold}` : `⚠ Sintetik data bilan o'qitilgan | Threshold: ${aeData.threshold}`}
+              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <Panel title="RECONSTRUCTION ERROR & ANOMALY SCORE" color="#e040fb">
                 <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -4143,6 +4162,7 @@ function AILabPage() {
                 </div>
               </Panel>
             </div>
+            </div>
           )}
           {aeData?.error && <div style={{ color: '#ff4444', padding: 20, fontFamily: 'Share Tech Mono' }}>Xato: {aeData.error}</div>}
         </div>
@@ -4152,8 +4172,21 @@ function AILabPage() {
       {tab === 'clustering' && (
         <div>
           {clusterLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>}
+          {clusterData && clusterData.error && (
+            <div style={{ padding: 30, textAlign: 'center', border: '1px solid #ffab0044', background: 'rgba(255,171,0,.06)', borderRadius: 4 }}>
+              <div style={{ color: '#ffab00', fontFamily: 'Share Tech Mono', fontSize: 14, marginBottom: 10 }}>⚠ {clusterData.error}</div>
+              <div style={{ color: '#4a6a84', fontSize: 12 }}>{clusterData.detail}</div>
+              <button className="filter-btn active" style={{ marginTop: 16 }} onClick={loadCluster}>QAYTA YUKLASH</button>
+            </div>
+          )}
           {clusterData && !clusterData.error && (
             <>
+              {clusterData.sources && (
+                <div style={{ marginBottom: 12, padding: '7px 12px', background: 'rgba(57,255,20,.06)', border: '1px solid #39ff1433', fontFamily: 'Share Tech Mono', fontSize: 11, color: '#39ff14', display: 'flex', gap: 20 }}>
+                  {clusterData.sources.threat_log && <span>✓ ThreatLog: {clusterData.sources.threat_log} ta</span>}
+                  {clusterData.sources.scan_record && <span>✓ Tarmoq skan: {clusterData.sources.scan_record} ta</span>}
+                </div>
+              )}
               <div className="stat-grid" style={{ marginBottom: 14 }}>
                 {[
                   ['NAMUNALAR', clusterData.n_samples, 'cyan'],
@@ -4218,7 +4251,7 @@ function AILabPage() {
               </div>
             </>
           )}
-          {(!clusterData || clusterData.error) && !clusterLoading && (
+          {!clusterData && !clusterLoading && (
             <div style={{ textAlign: 'center', padding: 40, color: '#4a6a84', fontFamily: 'Share Tech Mono' }}>
               <button className="filter-btn active" onClick={loadCluster}>KLASTERLASHNI BOSHLASH</button>
             </div>
@@ -4228,6 +4261,51 @@ function AILabPage() {
 
       {/* ── 5. DATASET YUKLASH ── */}
       {tab === 'dataset' && (
+        <div>
+          {/* Namuna datasetlar */}
+          {sampleDatasets.length > 0 && (
+            <Panel title="NAMUNA DATASETLAR — YUKLAB OLIB TEST QILING" color="#ffab00" style={{ marginBottom: 14 }}>
+              <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+                <div style={{ fontSize: 11, color: '#4a6a84', marginBottom: 14, fontFamily: 'Share Tech Mono' }}>
+                  O'z datasetingiz bo'lmasa — quyidagilardan birini yuklab oling, keyin yuqoridagi formaga yuklang.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {sampleDatasets.map(s => {
+                    const apiKey = localStorage.getItem('cg_api_key') || 'cyberguard-demo-key';
+                    return (
+                      <div key={s.id} style={{ padding: 16, border: `1px solid ${s.color}44`, background: `${s.color}08` }}>
+                        <div style={{ color: s.color, fontFamily: 'Share Tech Mono', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{s.name}</div>
+                        <div style={{ fontSize: 11, color: '#94b4c8', marginBottom: 8, lineHeight: 1.6 }}>{s.desc}</div>
+                        <div style={{ display: 'flex', gap: 12, fontSize: 10, fontFamily: 'Share Tech Mono', color: '#4a6a84', marginBottom: 12 }}>
+                          <span>{s.rows} qator</span>
+                          <span>{s.features} feature</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 10, lineHeight: 1.5 }}>
+                          <span style={{ color: s.color }}>Labels: </span>{s.labels}
+                        </div>
+                        <button
+                          className="action-btn"
+                          style={{ padding: '6px 14px', fontSize: 11, width: '100%' }}
+                          onClick={() => {
+                            fetch(api.getSampleDownloadUrl(s.id), { headers: { 'X-API-Key': apiKey } })
+                              .then(r => r.ok ? r.blob() : Promise.reject())
+                              .then(blob => {
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(blob);
+                                a.download = `sample_${s.id}.csv`;
+                                a.click();
+                                URL.revokeObjectURL(a.href);
+                              })
+                              .catch(() => {});
+                          }}
+                        >YUKLAB OLISH</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Panel>
+          )}
         <div>
           <Panel title="HAQIQIY DATASET YUKLASH (NSL-KDD / CICIDS2017 / Custom CSV)" color="#ffab00">
             <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
@@ -4259,7 +4337,7 @@ function AILabPage() {
                 {uploadLoading ? 'YUKLANMOQDA...' : 'DATASET YUKLASH'}
               </button>
               {uploadMsg && (
-                <div style={{ marginTop: 12, padding: 12, background: uploadMsg.startsWith('Xato') ? 'rgba(255,23,68,.1)' : 'rgba(57,255,20,.1)', color: uploadMsg.startsWith('Xato') ? '#ff4444' : '#39ff14', fontFamily: 'Share Tech Mono', fontSize: 12 }}>
+                <div style={{ marginTop: 12, padding: 12, background: uploadMsg.startsWith('Xato') ? 'rgba(255,23,68,.1)' : 'rgba(57,255,20,.1)', color: uploadMsg.startsWith('Xato') ? '#ff4444' : '#39ff14', fontFamily: 'Share Tech Mono', fontSize: 12, lineHeight: 1.7 }}>
                   {uploadMsg}
                 </div>
               )}
@@ -4271,7 +4349,7 @@ function AILabPage() {
               <div className="panel-body" style={{ overflowX: 'auto' }}>
                 <table className="alerts-table">
                   <thead>
-                    <tr><th>NOMI</th><th>FORMAT</th><th>YOZUVLAR</th><th>XUSUSIYATLAR</th><th>SINFLAR</th><th>SANA</th></tr>
+                    <tr><th>NOMI</th><th>FORMAT</th><th>YOZUVLAR</th><th>XUSUSIYATLAR</th><th>HOLAT</th><th>SANA</th></tr>
                   </thead>
                   <tbody>
                     {datasets.map(d => (
@@ -4280,7 +4358,7 @@ function AILabPage() {
                         <td className="td-mono">{d.format_type}</td>
                         <td className="td-mono">{d.row_count.toLocaleString()}</td>
                         <td className="td-mono">{d.feature_count}</td>
-                        <td style={{ fontSize: 11, color: '#4a6a84' }}>{(d.classes || []).slice(0, 4).join(', ')}</td>
+                        <td className="td-mono" style={{ color: d.is_trained ? '#39ff14' : '#4a6a84' }}>{d.is_trained ? "✓ O'QITILDI" : 'FAQAT YUKLANDI'}</td>
                         <td className="td-mono" style={{ fontSize: 10, color: '#4a6a84' }}>{new Date(d.created_at).toLocaleDateString()}</td>
                       </tr>
                     ))}
@@ -4289,6 +4367,7 @@ function AILabPage() {
               </div>
             </Panel>
           )}
+        </div>
         </div>
       )}
     </div>

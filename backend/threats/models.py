@@ -177,3 +177,54 @@ class IPAnalysisRecord(models.Model):
     def __str__(self):
         return f"{self.ip_address} -> {self.attack_type} ({self.threat_level})"
 
+
+class Incident(models.Model):
+    SEVERITY_CHOICES = [
+        ('critical', 'Kritik'),
+        ('high', 'Yuqori'),
+        ('medium', "O'rta"),
+        ('low', 'Past'),
+    ]
+
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    rule_name = models.CharField(max_length=100)
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='medium')
+    threat_type = models.CharField(max_length=50, default='anomaly')
+    involved_ips = models.JSONField(default=list)
+    is_resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Incident: {self.title} ({self.severity})"
+
+
+class DatasetUpload(models.Model):
+    FORMAT_CHOICES = [
+        ('nsl_kdd', 'NSL-KDD'),
+        ('cicids2017', 'CICIDS2017'),
+        ('unsw_nb15', 'UNSW-NB15'),
+        ('custom', 'Custom CSV'),
+    ]
+
+    name = models.CharField(max_length=200)
+    format_type = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='custom')
+    file_path = models.CharField(max_length=500, blank=True)
+    row_count = models.PositiveIntegerField(default=0)
+    feature_count = models.PositiveIntegerField(default=0)
+    classes = models.JSONField(default=list)
+    is_trained = models.BooleanField(default=False)
+    trained_at = models.DateTimeField(null=True, blank=True)
+    metrics = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} [{self.format_type}] {self.row_count} rows"
+

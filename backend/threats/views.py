@@ -1,3 +1,5 @@
+import json
+import numpy as np
 from textwrap import dedent
 
 from django.utils import timezone
@@ -61,10 +63,31 @@ from .serializers import (
 from .services import (
     analyze_threat,
     build_live_logs,
+    cluster_threats,
     discover_local_devices,
+    export_threats_csv,
+    export_threats_json,
+    generate_pdf_report,
+    get_all_mitre_mappings,
+    get_autoencoder_score,
     get_dashboard_stats,
+    get_feature_attribution,
+    get_heatmap_data,
+    get_incidents,
     get_ip_reputation,
+    get_mitre_info,
+    get_model_performance,
     get_target_intel,
+    get_threat_timeline,
+    run_correlation_engine,
+    retrain_models_from_csv_rows,
+    generate_sample_dataset,
+    SAMPLE_DATASETS,
+    FEATURE_NAMES,
+    RISKY_PORTS,
+    WEB_PORTS,
+    DATABASE_PORTS,
+    REMOTE_ADMIN_PORTS,
 )
 
 
@@ -670,15 +693,36 @@ def safe_scan_ip(request):
         timeout=serializer.validated_data.get('timeout', 0.35),
     )
     reputation = get_cached_reputation(serializer.validated_data['ip_address'])
+    open_ports = payload['open_ports']
+
+    from .services import classify_ip, _build_feature_vector
+    ip_info = classify_ip(serializer.validated_data['ip_address'])
+    features = {}
+    threat_level = 'low'
+    if ip_info.get('valid'):
+        telemetry = {
+            'open_ports': open_ports,
+            'open_port_count': len(open_ports),
+            'risky_port_count': len([p for p in open_ports if p in RISKY_PORTS]),
+            'web_port_count': len([p for p in open_ports if p in WEB_PORTS]),
+            'db_port_count': len([p for p in open_ports if p in DATABASE_PORTS]),
+            'remote_admin_exposed': any(p in REMOTE_ADMIN_PORTS for p in open_ports),
+            'abuse_score': int(reputation.get('abuse_score') or 0),
+            'reports': int(reputation.get('reports') or 0),
+        }
+        features = _build_feature_vector(ip_info, telemetry, '')
+        risky = telemetry['risky_port_count']
+        threat_level = 'high' if risky >= 3 else 'medium' if risky >= 1 else 'low'
+
     record = IPAnalysisRecord.objects.create(
         ip_address=payload['ip'],
         requested_ports=payload['requested_ports'],
-        open_ports=payload['open_ports'],
+        open_ports=open_ports,
         timeout_seconds=payload['timeout_seconds'],
-        features={},
-        threat_level='low',
-        attack_type='normal',
-        confidence=0.0,
+        features=features,
+        threat_level=threat_level,
+        attack_type='port_scan' if open_ports else 'normal',
+        confidence=round(min(len(open_ports) / 5, 1.0), 2) if open_ports else 0.0,
         intel=reputation,
         notes='Safe scan collector natijasi',
     )
@@ -854,3 +898,284 @@ def _simulate_block(ip_address: str, threat_log: ThreatLog, analysis: dict) -> b
     threat_log.save(update_fields=['is_blocked'])
     publish_event('response.blocked', {'ip': ip_address, 'mode': 'safe-simulated'})
     return True
+
+
+# ── YANGI ENDPOINTLAR ─────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def model_performance(request):
+    """Har bir ML algoritm uchun aniqlik metrikalarini qaytaradi."""
+    try:
+        data = get_model_performance()
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def feature_attribution(request):
+    """IP tahlil natijasi uchun feature attribution (SHAP-like) hisoblaydi."""
+    ip = request.data.get('ip_address', '127.0.0.1')
+    threat_type = request.data.get('threat_type', 'port_scan')
+    context = request.data.get('context', '')
+
+    from .services import classify_ip, _collect_ip_telemetry, _build_feature_vector
+
+    ip_info = classify_ip(ip)
+    if not ip_info.get('valid'):
+        return Response({'error': "Noto'g'ri IP"}, status=400)
+
+    telemetry = _collect_ip_telemetry(ip, ip_info)
+    features = _build_feature_vector(ip_info, telemetry, context)
+    feature_array = np.array([features[name] for name in FEATURE_NAMES], dtype=float)
+
+    IPAnalysisRecord.objects.update_or_create(
+        ip_address=ip,
+        defaults={
+            'open_ports': telemetry.get('open_ports', []),
+            'features': features,
+            'threat_level': 'high' if telemetry.get('risky_port_count', 0) >= 3 else 'medium' if telemetry.get('risky_port_count', 0) >= 1 else 'low',
+            'attack_type': threat_type if threat_type in ['ddos', 'sqli', 'brute_force', 'phishing', 'ransomware', 'mitm', 'zero_day', 'apt', 'port_scan'] else 'normal',
+            'confidence': 0.0,
+            'intel': {},
+            'notes': f'Feature attribution tahlili: {threat_type}',
+        },
+    )
+
+    try:
+        data = get_feature_attribution(feature_array, threat_type)
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def autoencoder_analysis(request):
+    """Autoencoder yordamida anomaliya/zero-day ehtimolini hisoblaydi."""
+    ip = request.data.get('ip_address', '127.0.0.1')
+    context = request.data.get('context', '')
+
+    from .services import classify_ip, _collect_ip_telemetry, _build_feature_vector
+
+    ip_info = classify_ip(ip)
+    if not ip_info.get('valid'):
+        return Response({'error': "Noto'g'ri IP"}, status=400)
+
+    telemetry = _collect_ip_telemetry(ip, ip_info)
+    features = _build_feature_vector(ip_info, telemetry, context)
+    feature_array = np.array([features[name] for name in FEATURE_NAMES], dtype=float)
+
+    IPAnalysisRecord.objects.update_or_create(
+        ip_address=ip,
+        defaults={
+            'open_ports': telemetry.get('open_ports', []),
+            'features': features,
+            'threat_level': 'high' if telemetry.get('risky_port_count', 0) >= 3 else 'medium' if telemetry.get('risky_port_count', 0) >= 1 else 'low',
+            'attack_type': 'anomaly',
+            'confidence': 0.0,
+            'intel': {},
+            'notes': 'Autoencoder anomaly tahlili',
+        },
+    )
+
+    try:
+        data = get_autoencoder_score(feature_array)
+        data['ip'] = ip
+        data['features'] = features
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+def dataset_upload(request):
+    """CSV dataset yuklash, parsing va modellarni qayta o'qitish."""
+    from .models import DatasetUpload
+    import csv
+    import io as _io
+
+    uploaded_file = request.FILES.get('file')
+    if not uploaded_file:
+        return Response({'error': 'Fayl yuklanmadi'}, status=400)
+
+    dataset_name = request.data.get('name', uploaded_file.name)
+    format_type = request.data.get('format_type', 'custom')
+    label_col = request.data.get('label_col', None)
+
+    try:
+        content = uploaded_file.read().decode('utf-8', errors='ignore')
+        reader = csv.DictReader(_io.StringIO(content))
+        rows = list(reader)
+        if not rows:
+            return Response({'error': "Fayl bo'sh yoki noto'g'ri format"}, status=400)
+
+        col_names = list(rows[0].keys())
+        classes = list(set(
+            row.get('label', row.get('class', row.get('attack_type', row.get('Label', 'unknown'))))
+            for row in rows[:100]
+        ))
+
+        retrain_result = retrain_models_from_csv_rows(rows, label_col=label_col)
+        trained = retrain_result.get('success', False)
+
+        record = DatasetUpload.objects.create(
+            name=dataset_name,
+            format_type=format_type,
+            row_count=len(rows),
+            feature_count=len(col_names),
+            classes=classes[:20],
+            is_trained=trained,
+            trained_at=timezone.now() if trained else None,
+            metrics=retrain_result if trained else {},
+        )
+
+        return Response({
+            'id': record.id,
+            'name': dataset_name,
+            'row_count': len(rows),
+            'feature_count': len(col_names),
+            'features': col_names[:20],
+            'classes': classes[:20],
+            'format_type': format_type,
+            'trained': trained,
+            'retrain': retrain_result,
+            'message': retrain_result.get('message') if trained else f"{len(rows)} ta yozuv yuklandi. " + retrain_result.get('error', ''),
+        })
+    except Exception as exc:
+        return Response({'error': f'Parsing xatosi: {str(exc)}'}, status=400)
+
+
+@api_view(['GET'])
+def sample_datasets_list(request):
+    """Namuna datasetlar metadatasini qaytaradi."""
+    return Response({'samples': SAMPLE_DATASETS})
+
+
+@api_view(['GET'])
+def sample_dataset_download(request, dataset_id):
+    """Namuna CSV dataset faylini yuklab olish."""
+    allowed = {d['id'] for d in SAMPLE_DATASETS}
+    if dataset_id not in allowed:
+        return Response({'error': "Noma'lum dataset ID"}, status=400)
+    try:
+        content = generate_sample_dataset(dataset_id)
+        resp = HttpResponse(content, content_type='text/csv; charset=utf-8')
+        resp['Content-Disposition'] = f'attachment; filename="sample_{dataset_id}.csv"'
+        return resp
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def dataset_list(request):
+    """Yuklangan datasetlar ro'yxatini qaytaradi."""
+    from .models import DatasetUpload
+    datasets = DatasetUpload.objects.order_by('-created_at')[:20]
+    return Response([
+        {
+            'id': d.id,
+            'name': d.name,
+            'format_type': d.format_type,
+            'row_count': d.row_count,
+            'feature_count': d.feature_count,
+            'classes': d.classes,
+            'is_trained': d.is_trained,
+            'created_at': d.created_at.isoformat(),
+        }
+        for d in datasets
+    ])
+
+
+@api_view(['GET'])
+def threat_timeline(request):
+    """Hujum vaqt chizig'i ma'lumotini qaytaradi."""
+    days = int(request.query_params.get('days', 7))
+    try:
+        data = get_threat_timeline(days=min(days, 30))
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def heatmap_data(request):
+    """Port va subnet heatmap ma'lumotini qaytaradi."""
+    try:
+        data = get_heatmap_data()
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def mitre_list(request):
+    """Barcha tahdid turlari uchun MITRE ATT&CK ma'lumotini qaytaradi."""
+    return Response({'mappings': get_all_mitre_mappings(), 'kill_chain_phases': [
+        {'name': 'Reconnaissance', 'label': 'Razvedka'},
+        {'name': 'Delivery', 'label': 'Yetkazish'},
+        {'name': 'Exploitation', 'label': 'Ekspluatatsiya'},
+        {'name': 'Installation', 'label': "O'rnatish"},
+        {'name': 'Command & Control', 'label': 'C2 Boshqaruv'},
+        {'name': 'Pivoting', 'label': 'Tarqalish'},
+        {'name': 'Actions on Objectives', 'label': 'Maqsad'},
+    ]})
+
+
+@api_view(['GET', 'POST'])
+def incidents(request):
+    """Intsidentlar ro'yxati va korrelyatsiya dvigatelni ishlatish."""
+    if request.method == 'POST':
+        new_incidents = run_correlation_engine()
+        existing = get_incidents()
+        publish_event('incident.checked', {'new': len(new_incidents)})
+        return Response({'new_incidents': new_incidents, 'all_incidents': existing})
+    return Response({'incidents': get_incidents()})
+
+
+@api_view(['GET'])
+def cluster_view(request):
+    """K-Means va DBSCAN klasterlash natijasini qaytaradi."""
+    try:
+        data = cluster_threats()
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def export_csv(request):
+    """Tahdid loglarini CSV formatda yuklab olish."""
+    try:
+        content = export_threats_csv()
+        response = HttpResponse(content, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="cyberguard_threats.csv"'
+        return response
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def export_json_data(request):
+    """Tahdid loglarini JSON formatda yuklab olish."""
+    try:
+        data = export_threats_json()
+        content = json.dumps(data, ensure_ascii=False, indent=2)
+        response = HttpResponse(content, content_type='application/json; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="cyberguard_threats.json"'
+        return response
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['GET'])
+def export_pdf(request):
+    """Tahdid hisobotini PDF formatda yuklab olish."""
+    try:
+        pdf_bytes = generate_pdf_report()
+        if not pdf_bytes:
+            return Response({'error': 'reportlab kutubxonasi o\'rnatilmagan. pip install reportlab'}, status=500)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="cyberguard_report.pdf"'
+        return response
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)

@@ -198,6 +198,22 @@ async function safeScan(data) {
   return post('/scan-ip/', data);
 }
 
+async function uploadDataset(formData) {
+  const response = await fetch(`${BASE}/dataset/upload/`, {
+    method: 'POST',
+    headers: { 'X-API-Key': getApiKey() },
+    body: formData,
+  });
+  const text = await response.text();
+  const data = text ? (() => { try { return JSON.parse(text); } catch { return { raw: text }; } })() : null;
+  if (!response.ok) {
+    const error = new Error(data?.detail || data?.error || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
 export const api = {
   getDashboard: () => get('/dashboard/'),
   analyzeThreat: data => post('/analyze/', data),
@@ -225,4 +241,21 @@ export const api = {
   launchLocalAgent,
   waitForLocalAgent,
   getLocalAgentDownloadUrl: scriptName => `${BASE}/local-agent/download/${encodeURIComponent(scriptName)}/`,
+  // ── Yangi endpointlar ───────────────────────────────────────────────────
+  getModelPerformance: () => get('/model/performance/'),
+  getFeatureAttribution: data => post('/model/attribution/', data),
+  getAutoencoderScore: data => post('/model/autoencoder/', data),
+  uploadDataset,
+  getDatasets: () => get('/dataset/list/'),
+  getThreatTimeline: (days = 7) => get(`/dashboard/timeline/?days=${days}`),
+  getHeatmap: () => get('/heatmap/'),
+  getMitreList: () => get('/mitre/'),
+  getIncidents: () => get('/incidents/'),
+  runCorrelation: () => post('/incidents/', {}),
+  getCluster: () => get('/cluster/'),
+  getExportCsvUrl: () => `${BASE}/export/csv/`,
+  getExportJsonUrl: () => `${BASE}/export/json/`,
+  getExportPdfUrl: () => `${BASE}/export/pdf/`,
+  getSampleDatasets: () => get('/dataset/samples/'),
+  getSampleDownloadUrl: (id) => `${BASE}/dataset/sample/${encodeURIComponent(id)}/`,
 };

@@ -349,6 +349,17 @@ body::before {
 .action-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 .action-btn:disabled { opacity: .4; cursor: not-allowed; }
 
+/* ── FORM INPUT ── */
+.form-input {
+  width: 100%; background: rgba(8,17,30,.85);
+  border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; font-family: 'Share Tech Mono',monospace;
+  font-size: 12px; outline: none; transition: border-color .2s;
+  box-sizing: border-box;
+}
+.form-input:focus { border-color: var(--cyan); }
+.form-input option { background: #0d1b2e; }
+
 /* ── CHART WRAPPERS ── */
 .chart-wrap    { position: relative; height: 200px; }
 .chart-wrap-sm { position: relative; height: 170px; }
