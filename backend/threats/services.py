@@ -1672,7 +1672,7 @@ def export_threats_json() -> list:
 
 def generate_pdf_report() -> bytes:
     """Tahdid hisobotini PDF formatida yaratadi."""
-    from .models import ThreatLog, BlockedIP, Incident
+    from .models import ThreatLog, BlockedIP
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
@@ -1696,7 +1696,11 @@ def generate_pdf_report() -> bytes:
     total = ThreatLog.objects.count()
     blocked_count = BlockedIP.objects.filter(is_active=True).count()
     critical_count = ThreatLog.objects.filter(severity='critical').count()
-    incident_count = Incident.objects.count()
+    try:
+        from .models import Incident
+        incident_count = Incident.objects.count()
+    except Exception:
+        incident_count = 0
 
     story.append(Paragraph('Umumiy Ko\'rsatkichlar', styles['Heading2']))
     summary_data = [
@@ -1977,4 +1981,416 @@ def get_dashboard_stats(logs) -> dict:
         'response_ms': 0,
         'false_positive_rate': 0.0,
         'hourly_trend': hourly_trend,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# XAI — EXPLAINABLE AI
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_xai_explanation(ip: str, context: str = '') -> dict:
+    """Feature-based XAI tushuntirish: model nima uchun bunday qaror qabul qildi."""
+    from .models import IPAnalysisRecord
+    import platform
+
+    features = None
+    record = IPAnalysisRecord.objects.filter(ip_address=ip).order_by('-scan_time').first()
+    if record and record.features:
+        features = record.features
+
+    if not features:
+        ip_info = classify_ip(ip)
+        telemetry = {'open_ports': [], 'response_time': 0}
+        features = _build_feature_vector(ip_info, telemetry, context)
+
+    bundle = _get_ml_bundle()
+    clf = bundle['clf']
+
+    feature_vector = [float(features.get(n, 0.0)) for n in FEATURE_NAMES]
+    X = np.array([feature_vector])
+
+    predicted_class = clf.predict(X)[0]
+    proba = clf.predict_proba(X)[0]
+    proba_dict = dict(zip(clf.classes_, proba.tolist()))
+
+    base_importances = clf.feature_importances_ if hasattr(clf, 'feature_importances_') else np.ones(len(FEATURE_NAMES)) / len(FEATURE_NAMES)
+
+    contributions = []
+    for i, name in enumerate(FEATURE_NAMES):
+        val = feature_vector[i]
+        importance = float(base_importances[i])
+        contributions.append({
+            'feature': name,
+            'value': round(val, 4),
+            'importance': round(importance, 4),
+            'contribution': round(val * importance, 4),
+            'direction': 'up' if val > 0.3 else 'down',
+        })
+
+    contributions.sort(key=lambda x: abs(x['contribution']), reverse=True)
+
+    threat_labels = {
+        'ddos': 'DDoS hujumi', 'sqli': 'SQL Injection', 'brute_force': 'Brute Force',
+        'phishing': 'Phishing', 'ransomware': 'Ransomware', 'mitm': 'MITM',
+        'zero_day': 'Zero-Day', 'apt': 'APT', 'port_scan': 'Port Skan',
+    }
+
+    top3 = contributions[:3]
+    reasons = []
+    for f in top3:
+        if f['value'] > 0.3:
+            readable = f['feature'].replace('_', ' ').replace('kw', 'kalit so\'z')
+            reasons.append(readable)
+
+    name = threat_labels.get(predicted_class, predicted_class)
+    explanation = (f"{name} ehtimoli yuqori, chunki: {', '.join(reasons)}." if reasons
+                   else f"Model {name} tahdidini aniqlamoqda.")
+
+    return {
+        'ip': ip,
+        'predicted_threat': predicted_class,
+        'predicted_threat_label': threat_labels.get(predicted_class, predicted_class),
+        'confidence': round(float(max(proba)), 3),
+        'probabilities': {k: round(v, 3) for k, v in proba_dict.items()},
+        'top_features': contributions[:8],
+        'all_features': contributions,
+        'explanation': explanation,
+        'signature': THREAT_SIGNATURES.get(predicted_class, {}),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LSTM / TIME-SERIES TREND PREDICTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+def lstm_trend_predict(hours_ahead: int = 6) -> dict:
+    """Tahdid trendi va kelajak bashoratlari (MLP time-series model)."""
+    from .models import ThreatLog
+
+    now = timezone.now()
+    history = []
+    for h in range(47, -1, -1):
+        t_start = now - timezone.timedelta(hours=h + 1)
+        t_end = now - timezone.timedelta(hours=h)
+        cnt = ThreatLog.objects.filter(created_at__gte=t_start, created_at__lt=t_end).count()
+        history.append(cnt)
+
+    is_real = sum(history) >= 3
+    if not is_real:
+        rng = Random(42)
+        history = [max(0, int(5 + 3 * (0.5 - rng.random()) * 2 + 2 * abs(rng.random()))) for _ in range(48)]
+
+    window = 6
+    X, y = [], []
+    for i in range(len(history) - window):
+        X.append(history[i:i + window])
+        y.append(history[i + window])
+
+    X = np.array(X, dtype=float)
+    y = np.array(y, dtype=float)
+
+    predictions = []
+    model_name = 'fallback'
+
+    if len(X) >= 5:
+        try:
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            mlp = MLPRegressor(hidden_layer_sizes=(32, 16), max_iter=600, random_state=42)
+            mlp.fit(X_scaled, y)
+            last_win = list(history[-window:])
+            for _ in range(hours_ahead):
+                x_in = scaler.transform([last_win])
+                pred = max(0, round(float(mlp.predict(x_in)[0])))
+                predictions.append(pred)
+                last_win = last_win[1:] + [pred]
+            model_name = 'MLP-TimeSeries'
+        except Exception:
+            predictions = []
+
+    if not predictions:
+        last_avg = max(1, int(sum(history[-window:]) / window))
+        predictions = [last_avg] * hours_ahead
+
+    recent_avg = sum(history[-6:]) / 6
+    pred_avg = sum(predictions) / len(predictions)
+    if pred_avg > recent_avg * 1.3:
+        trend = 'rising'
+    elif pred_avg < recent_avg * 0.7:
+        trend = 'falling'
+    else:
+        trend = 'stable'
+
+    # Per-type breakdown for last 24h
+    type_counts = {}
+    for threat in THREAT_ORDER:
+        cnt = ThreatLog.objects.filter(
+            threat_type=threat,
+            created_at__gte=now - timezone.timedelta(hours=24),
+        ).count()
+        type_counts[threat] = cnt
+
+    return {
+        'history': [{'hour': -(47 - i), 'count': v} for i, v in enumerate(history)],
+        'predictions': [{'hour': i + 1, 'count': int(v)} for i, v in enumerate(predictions)],
+        'trend': trend,
+        'trend_label': {'rising': 'O\'SISH', 'falling': 'PASAYISH', 'stable': 'BARQAROR'}[trend],
+        'is_real': is_real,
+        'model': model_name,
+        'recent_avg': round(recent_avg, 2),
+        'predicted_avg': round(pred_avg, 2),
+        'type_counts_24h': type_counts,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GEOIP — GEOGRAFIK TAHLIL
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_geoip_data(ip: str) -> dict:
+    """IP manzil uchun geografik ma'lumot (ip-api.com orqali)."""
+    try:
+        addr = ipaddress.ip_address(ip)
+        if addr.is_private or addr.is_loopback or addr.is_link_local:
+            return {
+                'ip': ip, 'country': 'Lokal', 'country_code': 'LO',
+                'region': 'LAN', 'city': 'Mahalliy tarmoq',
+                'lat': 41.2995, 'lon': 69.2401,
+                'isp': 'Mahalliy', 'org': 'Ichki tarmoq',
+                'is_proxy': False, 'is_hosting': False, 'risk': 'low',
+            }
+    except ValueError:
+        return {'ip': ip, 'error': "Noto'g'ri IP format"}
+
+    try:
+        resp = requests.get(
+            f'http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,'
+            f'region,regionName,city,lat,lon,isp,org,as,proxy,hosting',
+            timeout=6,
+        )
+        if resp.status_code == 200:
+            d = resp.json()
+            if d.get('status') == 'success':
+                return {
+                    'ip': ip,
+                    'country': d.get('country', 'Noma\'lum'),
+                    'country_code': d.get('countryCode', 'XX'),
+                    'region': d.get('regionName', ''),
+                    'city': d.get('city', ''),
+                    'lat': d.get('lat', 0),
+                    'lon': d.get('lon', 0),
+                    'isp': d.get('isp', ''),
+                    'org': d.get('org', ''),
+                    'is_proxy': d.get('proxy', False),
+                    'is_hosting': d.get('hosting', False),
+                    'risk': 'high' if (d.get('proxy') or d.get('hosting')) else 'low',
+                }
+    except Exception:
+        pass
+
+    return {'ip': ip, 'error': 'GeoIP xizmati mavjud emas', 'country': 'Noma\'lum'}
+
+
+def get_bulk_geoip(ips: list) -> list:
+    """Ko'p IP uchun geografik ma'lumot (tahdid loglardan)."""
+    from .models import ThreatLog
+    if not ips:
+        ips = list(ThreatLog.objects.values_list('ip_address', flat=True).distinct()[:30])
+    results = []
+    for ip in ips[:30]:
+        results.append(get_geoip_data(ip))
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AUTO BLOCK — TIZIM DARAJASIDA IP BLOKLASH
+# ─────────────────────────────────────────────────────────────────────────────
+
+def auto_block_ip_system(ip: str) -> dict:
+    """IP manzilni Windows Firewall (netsh) yoki iptables orqali bloklaydi."""
+    import platform as _platform
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return {'success': False, 'error': "Noto'g'ri IP format"}
+
+    from .models import BlockedIP
+    system = _platform.system()
+    result = {'ip': ip, 'system': system, 'success': False}
+
+    if system == 'Windows':
+        rule = f'CyberGuard-Block-{ip.replace(".", "_")}'
+        cmd = ['netsh', 'advfirewall', 'firewall', 'add', 'rule',
+               f'name={rule}', 'dir=in', 'action=block',
+               f'remoteip={ip}', 'enable=yes']
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result['success'] = proc.returncode == 0
+            result['output'] = proc.stdout.strip() or proc.stderr.strip()
+            result['rule_name'] = rule
+        except PermissionError:
+            result['error'] = 'Administrator huquqlari talab etiladi'
+        except subprocess.TimeoutExpired:
+            result['error'] = 'Buyruq vaqti tugadi'
+        except Exception as exc:
+            result['error'] = str(exc)
+    elif system == 'Linux':
+        cmd = ['iptables', '-I', 'INPUT', '-s', ip, '-j', 'DROP']
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result['success'] = proc.returncode == 0
+            result['output'] = proc.stdout.strip() or proc.stderr.strip()
+        except Exception as exc:
+            result['error'] = str(exc)
+    else:
+        result['error'] = f'Qo\'llab-quvvatlanmaydigan OS: {system}'
+
+    if result['success']:
+        BlockedIP.objects.get_or_create(
+            ip_address=ip,
+            defaults={'reason': 'CyberGuard AI tomonidan avtomatik bloklandi'},
+        )
+
+    return result
+
+
+def auto_unblock_ip_system(ip: str) -> dict:
+    """Avval bloklangan IP manzilni qoidadan o'chiradi."""
+    import platform as _platform
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return {'success': False, 'error': "Noto'g'ri IP format"}
+
+    system = _platform.system()
+    result = {'ip': ip, 'system': system, 'success': False}
+
+    if system == 'Windows':
+        rule = f'CyberGuard-Block-{ip.replace(".", "_")}'
+        cmd = ['netsh', 'advfirewall', 'firewall', 'delete', 'rule', f'name={rule}']
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result['success'] = proc.returncode == 0
+            result['output'] = proc.stdout.strip() or proc.stderr.strip()
+        except Exception as exc:
+            result['error'] = str(exc)
+    elif system == 'Linux':
+        cmd = ['iptables', '-D', 'INPUT', '-s', ip, '-j', 'DROP']
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result['success'] = proc.returncode == 0
+        except Exception as exc:
+            result['error'] = str(exc)
+    else:
+        result['error'] = f'Qo\'llab-quvvatlanmaydigan OS: {system}'
+
+    from .models import BlockedIP
+    BlockedIP.objects.filter(ip_address=ip).delete()
+
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TELEGRAM ALERT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_telegram_alert(message: str, token: str = None, chat_id: str = None) -> dict:
+    """Telegram bot orqali xabardorlik yuboradi."""
+    token = token or getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
+    chat_id = chat_id or getattr(settings, 'TELEGRAM_CHAT_ID', '')
+
+    if not token or not chat_id:
+        return {'success': False, 'error': 'Telegram token yoki chat_id sozlanmagan'}
+
+    try:
+        resp = requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'},
+            timeout=10,
+        )
+        data = resp.json()
+        return {
+            'success': data.get('ok', False),
+            'message_id': data.get('result', {}).get('message_id'),
+            'error': None if data.get('ok') else data.get('description'),
+        }
+    except Exception as exc:
+        return {'success': False, 'error': str(exc)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FOYDALANUVCHI XATTI-HARAKATI TAHLILI
+# ─────────────────────────────────────────────────────────────────────────────
+
+def analyze_user_behavior() -> dict:
+    """IP tahlil va tarmoq skan loglarini analiz qilib, xatti-harakat modelini chiqaradi."""
+    from .models import ThreatLog, IPAnalysisRecord
+
+    now = timezone.now()
+    last_24h = now - timezone.timedelta(hours=24)
+    last_7d = now - timezone.timedelta(days=7)
+
+    top_ips = list(
+        ThreatLog.objects.filter(created_at__gte=last_7d)
+        .values('ip_address')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+
+    blocked_ips = list(
+        ThreatLog.objects.filter(is_blocked=True, created_at__gte=last_7d)
+        .values('ip_address')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:5]
+    )
+
+    critical_events = list(
+        ThreatLog.objects.filter(severity='critical', created_at__gte=last_24h)
+        .values('ip_address', 'threat_type', 'created_at')
+        .order_by('-created_at')[:10]
+    )
+    for ev in critical_events:
+        ev['created_at'] = ev['created_at'].isoformat()
+
+    hourly_by_type = {}
+    for threat in THREAT_ORDER:
+        hourly_by_type[threat] = []
+        for h in range(23, -1, -1):
+            t_start = now - timezone.timedelta(hours=h + 1)
+            t_end = now - timezone.timedelta(hours=h)
+            cnt = ThreatLog.objects.filter(
+                created_at__gte=t_start, created_at__lt=t_end, threat_type=threat
+            ).count()
+            hourly_by_type[threat].append(cnt)
+
+    scan_count_24h = IPAnalysisRecord.objects.filter(scan_time__gte=last_24h).count()
+    scan_count_7d = IPAnalysisRecord.objects.filter(scan_time__gte=last_7d).count()
+    total_threats_7d = ThreatLog.objects.filter(created_at__gte=last_7d).count()
+    blocked_count_7d = ThreatLog.objects.filter(is_blocked=True, created_at__gte=last_7d).count()
+
+    anomalies = []
+    for ip_data in top_ips[:5]:
+        ip = ip_data['ip_address']
+        recent_cnt = ThreatLog.objects.filter(ip_address=ip, created_at__gte=last_24h).count()
+        older_per_day = ThreatLog.objects.filter(
+            ip_address=ip, created_at__gte=last_7d, created_at__lt=last_24h
+        ).count() / 6
+        if older_per_day > 0 and recent_cnt > older_per_day * 3:
+            anomalies.append({
+                'ip': ip,
+                'type': 'spike',
+                'message': f"{ip} 24 soatda {recent_cnt}x tahlil — odatdan 3x ko'proq",
+            })
+
+    return {
+        'top_ips': top_ips,
+        'blocked_ips': blocked_ips,
+        'critical_events': critical_events,
+        'hourly_by_type': hourly_by_type,
+        'scan_count_24h': scan_count_24h,
+        'scan_count_7d': scan_count_7d,
+        'total_threats_7d': total_threats_7d,
+        'blocked_count_7d': blocked_count_7d,
+        'anomalies': anomalies,
+        'period': '7 kunlik statistika',
     }

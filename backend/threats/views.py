@@ -88,6 +88,15 @@ from .services import (
     WEB_PORTS,
     DATABASE_PORTS,
     REMOTE_ADMIN_PORTS,
+    # ── Yangi xususiyatlar ───────────────────────────────────────────────────
+    get_xai_explanation,
+    lstm_trend_predict,
+    get_geoip_data,
+    get_bulk_geoip,
+    auto_block_ip_system,
+    auto_unblock_ip_system,
+    send_telegram_alert,
+    analyze_user_behavior,
 )
 
 
@@ -1179,3 +1188,124 @@ def export_pdf(request):
         return response
     except Exception as exc:
         return Response({'error': str(exc)}, status=500)
+
+
+# ── XAI — EXPLAINABLE AI ──────────────────────────────────────────────────────
+@api_view(['GET', 'POST'])
+def xai_explanation(request):
+    """IP uchun model nima uchun bunday qaror qabul qildi — XAI tushuntirish."""
+    try:
+        if request.method == 'POST':
+            ip = request.data.get('ip_address', '').strip()
+            context = request.data.get('context', '')
+        else:
+            ip = request.GET.get('ip', '').strip()
+            context = request.GET.get('context', '')
+        if not ip:
+            return Response({'error': 'ip_address talab etiladi'}, status=400)
+        data = get_xai_explanation(ip, context)
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── LSTM / TIME-SERIES TREND ──────────────────────────────────────────────────
+@api_view(['GET'])
+def lstm_predict(request):
+    """Tahdid trendi va MLP time-series bashorat."""
+    try:
+        hours = int(request.GET.get('hours', 6))
+        hours = max(1, min(hours, 24))
+        data = lstm_trend_predict(hours_ahead=hours)
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── GEOIP ─────────────────────────────────────────────────────────────────────
+@api_view(['GET'])
+def geoip_lookup(request):
+    """Bitta IP yoki barcha tahdid IP larining geografik ma'lumoti."""
+    try:
+        ip = request.GET.get('ip', '').strip()
+        if ip:
+            data = get_geoip_data(ip)
+            return Response(data)
+        # Bulk: tahdid loglaridagi IP lar
+        ips_param = request.GET.get('ips', '')
+        ips = [i.strip() for i in ips_param.split(',') if i.strip()] if ips_param else []
+        data = get_bulk_geoip(ips)
+        return Response({'results': data})
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── AUTO BLOCK ────────────────────────────────────────────────────────────────
+@api_view(['POST'])
+def auto_block_view(request):
+    """IP manzilni tizim Firewall orqali bloklaydi."""
+    try:
+        ip = request.data.get('ip_address', '').strip()
+        if not ip:
+            return Response({'error': 'ip_address talab etiladi'}, status=400)
+        result = auto_block_ip_system(ip)
+        status_code = 200 if result.get('success') else 400
+        return Response(result, status=status_code)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+@api_view(['POST'])
+def auto_unblock_view(request):
+    """Tizim Firewall dan IP manzil blokirovkasini olib tashlaydi."""
+    try:
+        ip = request.data.get('ip_address', '').strip()
+        if not ip:
+            return Response({'error': 'ip_address talab etiladi'}, status=400)
+        result = auto_unblock_ip_system(ip)
+        return Response(result)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── TELEGRAM ALERT ────────────────────────────────────────────────────────────
+@api_view(['POST'])
+def telegram_test_view(request):
+    """Telegram botni sinash uchun test xabar yuboradi."""
+    try:
+        token = request.data.get('token', '').strip()
+        chat_id = request.data.get('chat_id', '').strip()
+        message = request.data.get('message', '').strip() or (
+            '🔔 <b>CyberGuard AI</b> — Test xabari\n'
+            'Telegram integratsiyasi muvaffaqiyatli sozlandi!'
+        )
+        result = send_telegram_alert(message, token=token or None, chat_id=chat_id or None)
+        return Response(result)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── USER BEHAVIOR ANALYSIS ────────────────────────────────────────────────────
+@api_view(['GET'])
+def user_behavior_view(request):
+    """IP tahlil va skan loglaridan foydalanuvchi xatti-harakati tahlili."""
+    try:
+        data = analyze_user_behavior()
+        return Response(data)
+    except Exception as exc:
+        return Response({'error': str(exc)}, status=500)
+
+
+# ── MIGRATION TRIGGER (bir martalik ishlatish uchun) ──────────────────────────
+@api_view(['POST'])
+def run_pending_migrations(request):
+    """Kutilayotgan migration larni qo'llaydi (bir martalik foydalanish uchun)."""
+    from django.core.management import call_command
+    from io import StringIO
+    try:
+        out = StringIO()
+        call_command('migrate', '--noinput', stdout=out, stderr=out)
+        output = out.getvalue()
+        return Response({'success': True, 'output': output})
+    except Exception as exc:
+        return Response({'success': False, 'error': str(exc)}, status=500)

@@ -258,4 +258,14 @@ export const api = {
   getExportPdfUrl: () => `${BASE}/export/pdf/`,
   getSampleDatasets: () => get('/dataset/samples/'),
   getSampleDownloadUrl: (id) => `${BASE}/dataset/sample/${encodeURIComponent(id)}/`,
+  // ── Yangi xususiyatlar ───────────────────────────────────────────────────
+  getXaiExplanation: data => post('/xai/', data),
+  getLstmTrend: (hours = 6) => get(`/lstm/?hours=${hours}`),
+  getGeoip: ip => get(`/geoip/?ip=${encodeURIComponent(ip)}`),
+  getBulkGeoip: ips => get(`/geoip/?ips=${encodeURIComponent(ips.join(','))}`),
+  autoBlockIp: ip => post('/auto-block/', { ip_address: ip }),
+  autoUnblockIp: ip => post('/auto-unblock/', { ip_address: ip }),
+  testTelegram: data => post('/telegram/test/', data),
+  getUserBehavior: () => get('/behavior/'),
+  runMigration: () => post('/run-migration/', {}),
 };

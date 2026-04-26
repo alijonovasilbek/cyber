@@ -991,6 +991,7 @@ function ThreatsPage() {
   const [threats, setThreats]   = useState([]);
   const [filter, setFilter]     = useState('ALL');
   const [loading, setLoading]   = useState(true);
+  const [blockMsg, setBlockMsg] = useState('');
 
   const fetchThreats = useCallback(() => {
     api.getThreats()
@@ -1005,6 +1006,16 @@ function ThreatsPage() {
     fetchThreats();
   };
 
+  const sysBlockIP = async (ip) => {
+    setBlockMsg('');
+    try {
+      const res = await api.autoBlockIp(ip);
+      setBlockMsg(res.success ? `✓ ${ip} tizim Firewall orqali bloklandi` : `⚠ ${res.error || res.output || 'Xato'}`);
+      if (res.success) fetchThreats();
+    } catch (e) { setBlockMsg('Xato: ' + e.message); }
+    setTimeout(() => setBlockMsg(''), 5000);
+  };
+
   const types = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   const filtered = filter === 'ALL' ? threats : threats.filter(t => t.severity?.toUpperCase() === filter);
 
@@ -1016,6 +1027,11 @@ function ThreatsPage() {
         ))}
         <button className="filter-btn" style={{ marginLeft: 'auto' }} onClick={fetchThreats}>YANGILASH</button>
       </div>
+      {blockMsg && (
+        <div style={{ marginBottom: 10, padding: '8px 12px', fontFamily: 'Share Tech Mono', fontSize: 11, color: blockMsg.startsWith('✓') ? '#39ff14' : '#ffab00', background: blockMsg.startsWith('✓') ? 'rgba(57,255,20,.08)' : 'rgba(255,171,0,.08)', border: `1px solid ${blockMsg.startsWith('✓') ? '#39ff1444' : '#ffab0044'}` }}>
+          {blockMsg}
+        </div>
+      )}
       <Panel title={`TAHDID LOGLARI | ${filtered.length} VOQEA`} color="#ff1744">
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><div className="spinner"/></div>
@@ -1025,7 +1041,7 @@ function ThreatsPage() {
               <thead>
                 <tr>
                   <th>JIDDIYLIK</th><th>IP MANZIL</th><th>TAHDID TURI</th>
-                  <th>QURILMA</th><th>AI EHTIMOL</th><th>ALGORITM</th><th>HOLAT</th><th>AMAL</th>
+                  <th>QURILMA</th><th>AI EHTIMOL</th><th>ALGORITM</th><th>HOLAT</th><th>AMAL</th><th>TIZIM</th>
                 </tr>
               </thead>
               <tbody>
@@ -1062,6 +1078,13 @@ function ThreatsPage() {
                           BLOKLASH
                         </button>
                       )}
+                    </td>
+                    <td>
+                      <button className="action-btn" onClick={() => sysBlockIP(t.ip_address)}
+                        style={{ borderColor: 'rgba(255,100,0,.5)', color: '#ff6400', fontSize: 10, padding: '4px 8px' }}
+                        title="Windows Firewall / iptables orqali bloklash">
+                        FW BLOCK
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -3698,6 +3721,37 @@ function TopologyPage() {
 function SettingsPage() {
   const [toggles, setToggles] = useState({ realtime:true, sound:false, email:true, autoBlock:true, twofa:true });
   const toggle = k => setToggles(p => ({ ...p, [k]: !p[k] }));
+  const [tgToken, setTgToken] = useState(() => localStorage.getItem('cg_tg_token') || '');
+  const [tgChat, setTgChat] = useState(() => localStorage.getItem('cg_tg_chat') || '');
+  const [tgMsg, setTgMsg] = useState('');
+  const [tgLoading, setTgLoading] = useState(false);
+  const [migrateMsg, setMigrateMsg] = useState('');
+  const [migrateLoading, setMigrateLoading] = useState(false);
+
+  const runMigrate = async () => {
+    setMigrateLoading(true); setMigrateMsg('');
+    try {
+      const res = await api.runMigration();
+      setMigrateMsg(res.success ? `✓ Muvaffaqiyatli:\n${res.output || 'Barcha migrationlar qo\'llandi'}` : `⚠ Xato: ${res.error}`);
+    } catch (e) { setMigrateMsg('Xato: ' + e.message); }
+    setMigrateLoading(false);
+  };
+
+  const saveTelegram = () => {
+    localStorage.setItem('cg_tg_token', tgToken);
+    localStorage.setItem('cg_tg_chat', tgChat);
+    setTgMsg('✓ Saqlandi (faqat brauzer localStorage)');
+    setTimeout(() => setTgMsg(''), 3000);
+  };
+
+  const testTelegram = async () => {
+    setTgLoading(true); setTgMsg('');
+    try {
+      const res = await api.testTelegram({ token: tgToken, chat_id: tgChat });
+      setTgMsg(res.success ? `✓ Xabar yuborildi! ID: ${res.message_id}` : `⚠ ${res.error}`);
+    } catch (e) { setTgMsg('Xato: ' + e.message); }
+    setTgLoading(false);
+  };
 
   return (
     <div style={{ animation: 'fadeUp .3s ease' }}>
@@ -3736,6 +3790,17 @@ function SettingsPage() {
 
         <Panel title="TIZIM MA'LUMOTLARI" color="#39ff14">
           <div className="panel-body">
+            <div style={{ marginBottom: 14, padding: '10px 12px', background: '#39ff1408', border: '1px solid #39ff1433' }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', marginBottom: 8 }}>
+                Agar "relation does not exist" xatosi chiqsa — quyidagi tugmani bosib database migrationlarini qo'llang.
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <button className="action-btn" style={{ padding: '6px 14px', fontSize: 11, borderColor: '#39ff1466', color: '#39ff14' }} onClick={runMigrate} disabled={migrateLoading}>
+                  {migrateLoading ? 'QABUL QILINMOQDA...' : 'DB MIGRATIONLARNI QABUL QILISH'}
+                </button>
+                {migrateMsg && <span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: migrateMsg.startsWith('✓') ? '#39ff14' : '#ffab00', whiteSpace: 'pre-line' }}>{migrateMsg}</span>}
+              </div>
+            </div>
             {[
               ['Platforma','CyberGuard AI v4.2.1'],
               ['AI Dvigatel','Neural Threat Engine v2.3'],
@@ -3771,6 +3836,32 @@ function SettingsPage() {
                 </span>
               </div>
             ))}
+          </div>
+        </Panel>
+
+        <Panel title="TELEGRAM XABARDORLIK BOTI" color="#00aaff" style={{ gridColumn: '1 / -1' }}>
+          <div className="panel-body">
+            <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 14 }}>
+              Kritik tahdidlar aniqlanganda Telegram bot orqali darhol xabardorlik oling.
+              <span style={{ color: '#00aaff' }}> @BotFather</span> dan yangi bot yarating, token va chat ID ni kiriting.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>BOT TOKEN</div>
+                <input className="form-input" type="password" value={tgToken} onChange={e => setTgToken(e.target.value)} placeholder="1234567890:ABCdefGHI..."/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>CHAT ID</div>
+                <input className="form-input" value={tgChat} onChange={e => setTgChat(e.target.value)} placeholder="-1001234567890 yoki @username"/>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <button className="action-btn" style={{ padding: '8px 16px', fontSize: 12 }} onClick={saveTelegram}>SAQLASH</button>
+              <button className="action-btn" style={{ padding: '8px 16px', fontSize: 12, borderColor: '#00aaff66', color: '#00aaff' }} onClick={testTelegram} disabled={tgLoading || !tgToken || !tgChat}>
+                {tgLoading ? 'YUBORILMOQDA...' : 'TEST XABAR YUBORISH'}
+              </button>
+              {tgMsg && <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: tgMsg.startsWith('✓') ? '#39ff14' : '#ffab00' }}>{tgMsg}</span>}
+            </div>
           </div>
         </Panel>
       </div>
@@ -3823,6 +3914,22 @@ function AILabPage() {
   const [uploadName, setUploadName] = useState('');
   const [uploadFormat, setUploadFormat] = useState('custom');
   const [sampleDatasets, setSampleDatasets] = useState([]);
+  // ── GEOIP ────────────────────────────────────────────────────────────────
+  const [geoData, setGeoData] = useState(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoIP, setGeoIP] = useState('');
+  // ── XAI ──────────────────────────────────────────────────────────────────
+  const [xaiIP, setXaiIP] = useState('');
+  const [xaiCtx, setXaiCtx] = useState('');
+  const [xaiData, setXaiData] = useState(null);
+  const [xaiLoading, setXaiLoading] = useState(false);
+  // ── LSTM ─────────────────────────────────────────────────────────────────
+  const [lstmData, setLstmData] = useState(null);
+  const [lstmLoading, setLstmLoading] = useState(false);
+  const [lstmHours, setLstmHours] = useState(6);
+  // ── BEHAVIOR ─────────────────────────────────────────────────────────────
+  const [behaviorData, setBehaviorData] = useState(null);
+  const [behaviorLoading, setBehaviorLoading] = useState(false);
 
   const accent = themeAccent('cyan', '#00e5ff');
 
@@ -3833,6 +3940,9 @@ function AILabPage() {
       api.getDatasets().then(setDatasets).catch(() => {});
       if (!sampleDatasets.length) api.getSampleDatasets().then(d => setSampleDatasets(d.samples || [])).catch(() => {});
     }
+    if (tab === 'lstm' && !lstmData) loadLstm();
+    if (tab === 'behavior' && !behaviorData) loadBehavior();
+    if (tab === 'geoip' && !geoData) loadBulkGeoip();
   }, [tab]);
 
   const loadPerf = async () => {
@@ -3865,6 +3975,44 @@ function AILabPage() {
     setAeLoading(false);
   };
 
+  const loadXai = async () => {
+    if (!xaiIP.trim()) return;
+    setXaiLoading(true);
+    try {
+      const d = await api.getXaiExplanation({ ip_address: xaiIP.trim(), context: xaiCtx });
+      setXaiData(d);
+    } catch (e) { setXaiData({ error: e.message }); }
+    setXaiLoading(false);
+  };
+
+  const loadLstm = async () => {
+    setLstmLoading(true);
+    try { setLstmData(await api.getLstmTrend(lstmHours)); } catch { }
+    setLstmLoading(false);
+  };
+
+  const loadBehavior = async () => {
+    setBehaviorLoading(true);
+    try { setBehaviorData(await api.getUserBehavior()); } catch { }
+    setBehaviorLoading(false);
+  };
+
+  const loadBulkGeoip = async () => {
+    setGeoLoading(true);
+    try { setGeoData(await api.getBulkGeoip([])); } catch { }
+    setGeoLoading(false);
+  };
+
+  const lookupGeoip = async () => {
+    if (!geoIP.trim()) return;
+    setGeoLoading(true);
+    try {
+      const d = await api.getGeoip(geoIP.trim());
+      setGeoData({ single: d });
+    } catch { }
+    setGeoLoading(false);
+  };
+
   const handleUpload = async () => {
     if (!uploadFile) { setUploadMsg('Fayl tanlanmagan'); return; }
     setUploadLoading(true);
@@ -3889,9 +4037,13 @@ function AILabPage() {
 
   const tabs = [
     { id: 'performance', label: 'Model Samaradorligi' },
-    { id: 'shap', label: 'Feature Attribution (SHAP)' },
+    { id: 'shap', label: 'Feature Attribution' },
     { id: 'autoencoder', label: 'Autoencoder / Zero-Day' },
     { id: 'clustering', label: 'Klasterlash' },
+    { id: 'xai', label: 'XAI Tushuntirish' },
+    { id: 'lstm', label: 'LSTM Trend' },
+    { id: 'geoip', label: 'GeoIP Xaritasi' },
+    { id: 'behavior', label: 'Xatti-harakat' },
     { id: 'dataset', label: 'Dataset Yuklash' },
   ];
 
@@ -4368,6 +4520,388 @@ function AILabPage() {
             </Panel>
           )}
         </div>
+        </div>
+      )}
+
+      {/* ── 6. XAI TUSHUNTIRISH ── */}
+      {tab === 'xai' && (
+        <div>
+          <Panel title="XAI — EXPLAINABLE AI: MODEL NIMA UCHUN BU QARORNI QABUL QILDI?" color="#a855f7">
+            <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 14 }}>
+                IP manzilni kiriting — model u haqida qanday qaror qabul qilishini va <b style={{ color: '#a855f7' }}>NIMA UCHUN</b> aynan shunday deb o'ylashini tushuntiradi.
+                Feature importance va contribution asosida ishlaydi.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 10, marginBottom: 14, alignItems: 'flex-end' }}>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>IP MANZIL</div>
+                  <input className="form-input" value={xaiIP} onChange={e => setXaiIP(e.target.value)} placeholder="192.168.1.100"/>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>KONTEKST (ixtiyoriy)</div>
+                  <input className="form-input" value={xaiCtx} onChange={e => setXaiCtx(e.target.value)} placeholder="ssh brute force urinish..."/>
+                </div>
+                <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={loadXai} disabled={xaiLoading || !xaiIP.trim()}>
+                  {xaiLoading ? 'TAHLIL...' : 'TUSHUNTIR'}
+                </button>
+              </div>
+
+              {xaiData && !xaiData.error && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div style={{ padding: 14, background: '#a855f711', border: '1px solid #a855f744' }}>
+                      <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>BASHORAT QILINGAN TAHDID</div>
+                      <div style={{ fontSize: 16, color: '#a855f7', fontFamily: 'Share Tech Mono', fontWeight: 700 }}>{xaiData.predicted_threat_label}</div>
+                      <div style={{ fontSize: 10, color: '#4a6a84', marginTop: 2, fontFamily: 'Share Tech Mono' }}>{xaiData.predicted_threat}</div>
+                    </div>
+                    <div style={{ padding: 14, background: '#39ff1411', border: '1px solid #39ff1444' }}>
+                      <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>ISHONCH DARAJASI</div>
+                      <div style={{ fontSize: 24, color: '#39ff14', fontFamily: 'Share Tech Mono', fontWeight: 700 }}>{(xaiData.confidence * 100).toFixed(1)}%</div>
+                    </div>
+                    <div style={{ padding: 14, background: '#00e5ff11', border: '1px solid #00e5ff44' }}>
+                      <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>TUSHUNTIRISH</div>
+                      <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.6 }}>{xaiData.explanation}</div>
+                    </div>
+                  </div>
+
+                  <Panel title="FEATURE HISSALARI (Feature Contributions)" color="#a855f7">
+                    <div className="panel-body" style={{ paddingTop: 8 }}>
+                      {(xaiData.top_features || []).map((f, i) => (
+                        <div key={f.feature} style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: f.direction === 'up' ? '#ff6b6b' : '#39ff14' }}>
+                              {f.direction === 'up' ? '▲' : '▼'} {f.feature}
+                            </span>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: '#4a6a84' }}>
+                              val={f.value.toFixed(3)}  imp={f.importance.toFixed(3)}  contrib={f.contribution.toFixed(4)}
+                            </span>
+                          </div>
+                          <div style={{ height: 8, background: 'rgba(255,255,255,.05)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.min(Math.abs(f.contribution) * 500, 100)}%`, background: f.direction === 'up' ? '#ff6b6b' : '#39ff14', transition: 'width .5s' }}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Panel>
+
+                  {xaiData.signature && Object.keys(xaiData.signature).length > 0 && (
+                    <Panel title={`TAHDID IMZOSI — ${xaiData.predicted_threat_label}`} color="#ff6b6b" style={{ marginTop: 14 }}>
+                      <div className="panel-body" style={{ paddingTop: 10 }}>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 6 }}>INDIKATORLAR</div>
+                          {(xaiData.signature.indicators || []).map((ind, i) => (
+                            <div key={i} style={{ fontSize: 11, color: '#94b4c8', marginBottom: 4 }}>• {ind}</div>
+                          ))}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 6 }}>HIMOYA CHORALARI</div>
+                          {(xaiData.signature.mitigation || []).map((m, i) => (
+                            <div key={i} style={{ fontSize: 11, color: '#39ff14', marginBottom: 4 }}>✓ {m}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </Panel>
+                  )}
+
+                  <Panel title="BARCHA TAHDIDLAR EHTIMOLI" color="#4a6a84" style={{ marginTop: 14 }}>
+                    <div className="panel-body" style={{ paddingTop: 8 }}>
+                      {Object.entries(xaiData.probabilities || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#94b4c8', minWidth: 100 }}>{k}</span>
+                          <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,.05)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${v * 100}%`, background: k === xaiData.predicted_threat ? '#a855f7' : '#4a6a84', transition: 'width .5s' }}/>
+                          </div>
+                          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: k === xaiData.predicted_threat ? '#a855f7' : '#4a6a84', minWidth: 45 }}>{(v * 100).toFixed(1)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Panel>
+                </div>
+              )}
+              {xaiData?.error && <div style={{ color: '#ff4444', fontFamily: 'Share Tech Mono', fontSize: 12 }}>Xato: {xaiData.error}</div>}
+              {!xaiData && !xaiLoading && (
+                <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', textAlign: 'center', padding: 30 }}>
+                  IP manzil kiriting va TUSHUNTIR tugmasini bosing
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ── 7. LSTM TREND PREDICTION ── */}
+      {tab === 'lstm' && (
+        <div>
+          <Panel title="LSTM / MLP TIME-SERIES — TAHDID TRENDI BASHORATI" color="#00e5ff">
+            <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 14 }}>
+                So'nggi 48 soatlik tahdid tarixi asosida MLP vaqt qatori modeli kelajakdagi tahdid sonini bashorat qiladi.
+                Real ma'lumotlar bo'lmasa, demo rejimida ishlaydi.
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>OLDINDAN KO'RA (soat)</div>
+                  <select className="form-input" style={{ width: 120 }} value={lstmHours} onChange={e => setLstmHours(+e.target.value)}>
+                    {[3, 6, 12, 24].map(h => <option key={h} value={h}>{h} soat</option>)}
+                  </select>
+                </div>
+                <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={loadLstm} disabled={lstmLoading}>
+                  {lstmLoading ? 'HISOBLANMOQDA...' : 'YANGILASH'}
+                </button>
+                {lstmData && (
+                  <div style={{ padding: '6px 14px', background: lstmData.is_real ? '#39ff1411' : '#ffab0011', border: `1px solid ${lstmData.is_real ? '#39ff1444' : '#ffab0044'}`, fontFamily: 'Share Tech Mono', fontSize: 10, color: lstmData.is_real ? '#39ff14' : '#ffab00' }}>
+                    {lstmData.is_real ? '✓ REAL DATA' : '⚠ DEMO DATA'}
+                  </div>
+                )}
+              </div>
+
+              {lstmLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><div className="spinner"/></div>}
+
+              {lstmData && !lstmLoading && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                    {[
+                      { label: 'TREND', value: lstmData.trend_label, color: lstmData.trend === 'rising' ? '#ff4444' : lstmData.trend === 'falling' ? '#39ff14' : '#ffab00' },
+                      { label: 'JORIY O\'RTA', value: lstmData.recent_avg?.toFixed(1) + '/soat', color: '#00e5ff' },
+                      { label: 'BASHORAT O\'RTA', value: lstmData.predicted_avg?.toFixed(1) + '/soat', color: '#a855f7' },
+                      { label: 'MODEL', value: lstmData.model, color: '#39ff14' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ padding: 12, background: `${color}11`, border: `1px solid ${color}44`, textAlign: 'center' }}>
+                        <div style={{ fontSize: 9, color: '#4a6a84', marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontFamily: 'Share Tech Mono', fontSize: 13, color, fontWeight: 700 }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Panel title="TARIX (so'nggi 48 soat) + BASHORAT" color="#00e5ff">
+                    <div className="panel-body" style={{ paddingTop: 12, overflowX: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 140, minWidth: 600 }}>
+                        {(lstmData.history || []).slice(-24).map((h, i) => {
+                          const maxH = Math.max(...(lstmData.history || []).map(x => x.count), ...(lstmData.predictions || []).map(x => x.count), 1);
+                          return (
+                            <div key={i} title={`${h.hour}h: ${h.count}`} style={{ flex: 1, height: `${(h.count / maxH) * 100}%`, background: '#00e5ff88', minHeight: 2, position: 'relative' }}/>
+                          );
+                        })}
+                        <div style={{ width: 2, background: '#ffab00', alignSelf: 'stretch' }}/>
+                        {(lstmData.predictions || []).map((p, i) => {
+                          const maxH = Math.max(...(lstmData.history || []).map(x => x.count), ...(lstmData.predictions || []).map(x => x.count), 1);
+                          return (
+                            <div key={i} title={`+${p.hour}h: ${p.count}`} style={{ flex: 1, height: `${(p.count / maxH) * 100}%`, background: '#a855f7aa', minHeight: 2, border: '1px dashed #a855f7' }}/>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 10, fontFamily: 'Share Tech Mono', color: '#4a6a84' }}>
+                        <span style={{ color: '#00e5ff' }}>■ Tarix (24 soat)</span>
+                        <span style={{ color: '#ffab00' }}>| Hozir</span>
+                        <span style={{ color: '#a855f7' }}>■ Bashorat ({lstmHours} soat)</span>
+                      </div>
+                    </div>
+                  </Panel>
+
+                  {lstmData.type_counts_24h && (
+                    <Panel title="TAHDID TURLARI — SO'NGI 24 SOAT" color="#a855f7" style={{ marginTop: 14 }}>
+                      <div className="panel-body" style={{ paddingTop: 8 }}>
+                        {Object.entries(lstmData.type_counts_24h).map(([k, v]) => (
+                          <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#94b4c8', minWidth: 100 }}>{k}</span>
+                            <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,.05)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(v * 10, 100)}%`, background: '#a855f7', transition: 'width .5s' }}/>
+                            </div>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#a855f7', minWidth: 30 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </Panel>
+                  )}
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ── 8. GEOIP XARITASI ── */}
+      {tab === 'geoip' && (
+        <div>
+          <Panel title="GEOIP — IP MANZILLAR GEOGRAFIYASI" color="#39ff14">
+            <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.8, marginBottom: 14 }}>
+                Tahdid loglaridagi IP manzillar qayerdan kelganini ko'ring. ip-api.com orqali aniqlanadi (bepul, API kalit talab qilmaydi).
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 4 }}>BITTA IP QIDIRISH</div>
+                  <input className="form-input" value={geoIP} onChange={e => setGeoIP(e.target.value)} placeholder="8.8.8.8" onKeyDown={e => e.key === 'Enter' && lookupGeoip()}/>
+                </div>
+                <button className="action-btn" style={{ padding: '8px 16px', fontSize: 12 }} onClick={lookupGeoip} disabled={geoLoading || !geoIP.trim()}>QIDIRISH</button>
+                <button className="filter-btn" onClick={loadBulkGeoip} disabled={geoLoading}>BARCHA TAHDIDLAR</button>
+              </div>
+
+              {geoLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><div className="spinner"/></div>}
+
+              {geoData && !geoLoading && (() => {
+                const items = geoData.single ? [geoData.single] : (geoData.results || []);
+                const riskColor = r => r === 'high' ? '#ff1744' : r === 'medium' ? '#ffab00' : '#39ff14';
+                return (
+                  <div>
+                    {geoData.single && (
+                      <div style={{ marginBottom: 14, padding: 16, background: '#39ff1411', border: '1px solid #39ff1444' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                          {[
+                            ['IP', geoData.single.ip],
+                            ['MAMLAKAT', `${geoData.single.country_code} — ${geoData.single.country}`],
+                            ['SHAHAR', `${geoData.single.city || '-'}, ${geoData.single.region || '-'}`],
+                            ['ISP', geoData.single.isp || '-'],
+                            ['KOORDINATLAR', geoData.single.lat ? `${geoData.single.lat?.toFixed(2)}, ${geoData.single.lon?.toFixed(2)}` : '-'],
+                            ['XAVF', geoData.single.risk?.toUpperCase() || '-'],
+                          ].map(([k, v]) => (
+                            <div key={k}>
+                              <div style={{ fontSize: 9, color: '#4a6a84', marginBottom: 2 }}>{k}</div>
+                              <div style={{ fontFamily: 'Share Tech Mono', fontSize: 12, color: k === 'XAVF' ? riskColor(geoData.single.risk) : '#94b4c8' }}>{v}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {geoData.single.is_proxy && <div style={{ marginTop: 8, color: '#ff1744', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ PROXY / VPN ANIQLANDI</div>}
+                        {geoData.single.is_hosting && <div style={{ marginTop: 4, color: '#ffab00', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ HOSTING / DATACENTER IP</div>}
+                        {geoData.single.error && <div style={{ color: '#ff4444', fontSize: 11 }}>{geoData.single.error}</div>}
+                      </div>
+                    )}
+
+                    {items.length > 0 && (
+                      <table className="alerts-table">
+                        <thead>
+                          <tr><th>#</th><th>IP</th><th>MAMLAKAT</th><th>SHAHAR</th><th>ISP</th><th>PROXY</th><th>XAVF</th></tr>
+                        </thead>
+                        <tbody>
+                          {items.map((g, i) => (
+                            <tr key={g.ip || i}>
+                              <td className="td-mono" style={{ color: '#4a6a84' }}>{i + 1}</td>
+                              <td className="td-mono">{g.ip}</td>
+                              <td className="td-mono">{g.country_code} — {g.country}</td>
+                              <td className="td-mono" style={{ fontSize: 10, color: '#4a6a84' }}>{g.city || '-'}</td>
+                              <td className="td-mono" style={{ fontSize: 10, color: '#4a6a84' }}>{g.isp || '-'}</td>
+                              <td className="td-mono" style={{ color: g.is_proxy ? '#ff1744' : '#39ff14' }}>{g.is_proxy ? 'HA' : 'YOQ'}</td>
+                              <td><span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: riskColor(g.risk) }}>{(g.risk || 'low').toUpperCase()}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                );
+              })()}
+              {!geoData && !geoLoading && (
+                <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', textAlign: 'center', padding: 30 }}>
+                  IP kiriting yoki "BARCHA TAHDIDLAR" tugmasini bosing
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ── 9. XATTI-HARAKAT TAHLILI ── */}
+      {tab === 'behavior' && (
+        <div>
+          <Panel title="XATTI-HARAKAT TAHLILI — IP VA TARMOQ SKAN STATISTIKASI" color="#ffab00">
+            <div className="panel-body" style={{ paddingTop: 12, paddingBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                <button className="action-btn" style={{ padding: '8px 20px', fontSize: 12 }} onClick={loadBehavior} disabled={behaviorLoading}>
+                  {behaviorLoading ? 'YUKLANMOQDA...' : 'YANGILASH'}
+                </button>
+              </div>
+
+              {behaviorLoading && <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><div className="spinner"/></div>}
+
+              {behaviorData && !behaviorLoading && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+                    {[
+                      { label: "7 KUNLIK TAHDIDLAR", value: behaviorData.total_threats_7d, color: '#ff4444' },
+                      { label: 'BLOKLANGAN (7 kun)', value: behaviorData.blocked_count_7d, color: '#ffab00' },
+                      { label: 'SKANLAR (24 soat)', value: behaviorData.scan_count_24h, color: '#00e5ff' },
+                      { label: 'SKANLAR (7 kun)', value: behaviorData.scan_count_7d, color: '#39ff14' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{ padding: 12, background: `${color}11`, border: `1px solid ${color}44`, textAlign: 'center' }}>
+                        <div style={{ fontSize: 9, color: '#4a6a84', marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontFamily: 'Share Tech Mono', fontSize: 20, color, fontWeight: 700 }}>{value ?? 0}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(behaviorData.anomalies || []).length > 0 && (
+                    <div style={{ marginBottom: 14, padding: 12, background: '#ff444411', border: '1px solid #ff444444' }}>
+                      <div style={{ fontSize: 11, color: '#ff4444', fontFamily: 'Share Tech Mono', fontWeight: 700, marginBottom: 8 }}>ANOMALIYALAR ANIQLANDI</div>
+                      {behaviorData.anomalies.map((a, i) => (
+                        <div key={i} style={{ fontSize: 11, color: '#ffab00', marginBottom: 4 }}>⚠ {a.message}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    <Panel title="ENG KO'P TAHLIL QILINGAN IP LAR (7 kun)" color="#ffab00">
+                      <div className="panel-body" style={{ paddingTop: 8 }}>
+                        {(behaviorData.top_ips || []).map((item, i) => (
+                          <div key={item.ip_address} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: '#4a6a84', minWidth: 20 }}>#{i+1}</span>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#94b4c8', flex: 1 }}>{item.ip_address}</span>
+                            <div style={{ width: 80, height: 6, background: 'rgba(255,255,255,.05)', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(item.count / ((behaviorData.top_ips[0]?.count || 1)) * 100, 100)}%`, background: '#ffab00' }}/>
+                            </div>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00', minWidth: 30 }}>{item.count}</span>
+                          </div>
+                        ))}
+                        {(behaviorData.top_ips || []).length === 0 && (
+                          <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', fontSize: 11 }}>Hali ma'lumot yo'q</div>
+                        )}
+                      </div>
+                    </Panel>
+
+                    <Panel title="KO'P BLOKLANGAN IP LAR (7 kun)" color="#ff4444">
+                      <div className="panel-body" style={{ paddingTop: 8 }}>
+                        {(behaviorData.blocked_ips || []).map((item, i) => (
+                          <div key={item.ip_address} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 10, color: '#4a6a84', minWidth: 20 }}>#{i+1}</span>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#94b4c8', flex: 1 }}>{item.ip_address}</span>
+                            <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ff4444', minWidth: 30 }}>{item.count}x</span>
+                          </div>
+                        ))}
+                        {(behaviorData.blocked_ips || []).length === 0 && (
+                          <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', fontSize: 11 }}>Bloklangan IP yo'q</div>
+                        )}
+                      </div>
+                    </Panel>
+                  </div>
+
+                  {(behaviorData.critical_events || []).length > 0 && (
+                    <Panel title="KRITIK HODISALAR — SO'NGI 24 SOAT" color="#ff1744" style={{ marginTop: 14 }}>
+                      <div className="panel-body" style={{ overflowX: 'auto', paddingTop: 8 }}>
+                        <table className="alerts-table">
+                          <thead>
+                            <tr><th>IP</th><th>TAHDID TURI</th><th>VAQT</th></tr>
+                          </thead>
+                          <tbody>
+                            {(behaviorData.critical_events || []).map((ev, i) => (
+                              <tr key={i}>
+                                <td style={{ color: '#ff6b6b', fontFamily: 'Share Tech Mono' }}>{ev.ip_address}</td>
+                                <td className="td-mono">{ev.threat_type}</td>
+                                <td className="td-mono" style={{ fontSize: 10, color: '#4a6a84' }}>{new Date(ev.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Panel>
+                  )}
+                </div>
+              )}
+              {!behaviorData && !behaviorLoading && (
+                <div style={{ color: '#4a6a84', fontFamily: 'Share Tech Mono', textAlign: 'center', padding: 30 }}>
+                  YANGILASH tugmasini bosib statistikani ko'ring
+                </div>
+              )}
+            </div>
+          </Panel>
         </div>
       )}
     </div>

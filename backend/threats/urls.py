@@ -39,5 +39,14 @@ urlpatterns = [
     path('export/csv/', views.export_csv),
     path('export/json/', views.export_json_data),
     path('export/pdf/', views.export_pdf),
+    # ── Yangi xususiyatlar ───────────────────────────────────────────────────
+    path('xai/', views.xai_explanation),
+    path('lstm/', views.lstm_predict),
+    path('geoip/', views.geoip_lookup),
+    path('auto-block/', views.auto_block_view),
+    path('auto-unblock/', views.auto_unblock_view),
+    path('telegram/test/', views.telegram_test_view),
+    path('behavior/', views.user_behavior_view),
+    path('run-migration/', views.run_pending_migrations),
     path('', include(router.urls)),
 ]
