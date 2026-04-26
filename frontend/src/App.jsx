@@ -1179,6 +1179,22 @@ function NetworkPage({ onAnalyze }) {
         setSelectedWifi(wifiPayload.connected_ssid);
         setWifiForm(form => ({ ...form, ssid: wifiPayload.connected_ssid }));
       }
+
+      // ── Default fieldlarni avtomatik to'ldirish ──────────────────────────
+      const firstIface = (interfacePayload.interfaces || [])[0];
+      if (firstIface) {
+        const myIP   = firstIface.ip || '';
+        const gateway = (firstIface.gateways || [])[0] || '';
+        const label  = wifiPayload?.connected_ssid || firstIface.name || '';
+        // Safe IP Collector: o'z IP sini yoki gateway ni taklif qilish
+        setSafeScanForm(f => f.ip ? f : { ...f, ip: gateway || myIP });
+        // Connection Profile: gateway IP va tarmoq nomini oldin to'ldirish
+        setProfileForm(p => ({
+          ...p,
+          target_host: p.target_host || gateway || myIP,
+          network_label: p.network_label || label,
+        }));
+      }
     } catch {
       setDevices([]);
       setInterfaces([]);
@@ -1643,18 +1659,41 @@ function NetworkPage({ onAnalyze }) {
       )}
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:14, marginTop:14 }}>
-        <Panel title="SAFE IP COLLECTOR" color={cyan}>
+        <Panel title="SAFE IP COLLECTOR — PORT SKANER" color={cyan}>
           <div className="panel-body">
+            {/* Tushuntirish satrlari */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>
+              {[
+                { icon: '①', title: 'IP MANZIL', desc: 'Tekshiriladigan IP: router (gateway), tarmog\'ingizda ko\'ringan qurilma yoki istalgan IP.' },
+                { icon: '②', title: 'PORTLAR', desc: 'Vergul bilan ajratilgan portlar. 21=FTP, 22=SSH, 23=Telnet, 80=HTTP, 443=HTTPS, 3389=RDP.' },
+                { icon: '③', title: 'TIMEOUT', desc: 'Har bir port uchun kutish vaqti (soniya). 0.35s — tezlik va aniqlik muvozanati.' },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} style={{ padding: '10px 12px', background: 'rgba(0,229,255,.04)', border: '1px solid rgba(0,229,255,.15)' }}>
+                  <div style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: cyan, marginBottom: 4 }}>{icon} {title}</div>
+                  <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.6 }}>{desc}</div>
+                </div>
+              ))}
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr .6fr auto', gap:10, alignItems:'center' }}>
-              <input value={safeScanForm.ip} onChange={e => setSafeScanForm(form => ({ ...form, ip: e.target.value }))} placeholder="IP address" style={inputStyle}/>
-              <input value={safeScanForm.ports} onChange={e => setSafeScanForm(form => ({ ...form, ports: e.target.value }))} placeholder="21,22,80,443" style={inputStyle}/>
-              <input value={safeScanForm.timeout} onChange={e => setSafeScanForm(form => ({ ...form, timeout: e.target.value }))} type="number" step="0.05" min="0.05" max="0.5" style={inputStyle}/>
-              <button className="action-btn" onClick={runSafeScan} disabled={safeScanBusy || !safeScanForm.ip}>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>IP MANZIL (gateway yoki qurilma)</div>
+                <input value={safeScanForm.ip} onChange={e => setSafeScanForm(form => ({ ...form, ip: e.target.value }))} placeholder="192.168.0.1" style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>PORTLAR (vergul bilan)</div>
+                <input value={safeScanForm.ports} onChange={e => setSafeScanForm(form => ({ ...form, ports: e.target.value }))} placeholder="21,22,80,443" style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>TIMEOUT (s)</div>
+                <input value={safeScanForm.timeout} onChange={e => setSafeScanForm(form => ({ ...form, timeout: e.target.value }))} type="number" step="0.05" min="0.05" max="0.5" style={inputStyle}/>
+              </div>
+              <button className="action-btn" onClick={runSafeScan} disabled={safeScanBusy || !safeScanForm.ip} style={{ marginTop: 18 }}>
                 {safeScanBusy ? 'SCANNING...' : 'SCAN-IP'}
               </button>
             </div>
             <div style={{ marginTop:8, color:'#4a6a84', fontSize:11, lineHeight:1.7 }}>
               Safe mode: maksimal 10 port, timeout 0.5s dan oshmaydi. Aggressive probing qilinmaydi.
+              Natija: qaysi portlar <span style={{ color: '#39ff14' }}>OPEN</span> yoki <span style={{ color: '#ff4444' }}>CLOSED</span> — IP Tahlilga yuboriladi.
             </div>
             {safeScanResult && (
               <div style={{ marginTop:12, display:'grid', gap:10 }}>
@@ -1835,37 +1874,98 @@ function NetworkPage({ onAnalyze }) {
           </div>
         </Panel>
 
-        <Panel title="CONNECTION PROFILE" color={purple}>
+        <Panel title="CONNECTION PROFILE — CREDENTIALED SCAN" color={purple}>
           <div className="panel-body">
+            {/* Protokol tushuntirish */}
+            <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(168,85,247,.05)', border: '1px solid rgba(168,85,247,.2)', fontSize: 11, color: '#94b4c8', lineHeight: 1.7 }}>
+              {profileForm.profile_type === 'ssh'    && <><span style={{ color: purple }}>SSH</span> — Router/server ga SSH kirish. Username+password bilan ulanib qurilma ma'lumotini yig'adi (hostname, versiya, config). Ko'p Linux routerlarda ishlaydi.</>}
+              {profileForm.profile_type === 'telnet' && <><span style={{ color: purple }}>Telnet</span> — Eski Cisco/Mikrotik routerlarda qo'llanadi. SSH xavfsizroq, lekin ba'zi qurilmalar faqat Telnet qabul qiladi.</>}
+              {profileForm.profile_type === 'snmp'   && <><span style={{ color: purple }}>SNMP v2c</span> — Tarmoq monitoringi protokoli. Community string (odatda "public") bilan router/switch dan statistika o'qiydi. Parol talab qilmaydi.</>}
+              {profileForm.profile_type === 'web'    && <><span style={{ color: purple }}>WEB/HTTP</span> — Router admin panelini (192.168.0.1:80) probe qiladi. Sarlavha, auth turi, HTTP status va latency qaytaradi.</>}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <input value={profileForm.name} onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))} placeholder="Profile nomi" style={inputStyle}/>
-              <select value={profileForm.profile_type} onChange={e => setProfileForm(p => ({ ...p, profile_type: e.target.value, port: getDefaultProfilePort(e.target.value) }))} style={inputStyle}>
-                <option value="ssh">SSH</option>
-                <option value="telnet">Telnet</option>
-                <option value="snmp">SNMP</option>
-                <option value="web">WEB/HTTP</option>
-              </select>
-              <input value={profileForm.target_host} onChange={e => setProfileForm(p => ({ ...p, target_host: e.target.value }))} placeholder="Target host/IP" style={inputStyle}/>
-              <input value={profileForm.port} onChange={e => setProfileForm(p => ({ ...p, port: Number(e.target.value || 0) }))} placeholder="Port" type="number" style={inputStyle}/>
-              <input value={profileForm.username} onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Username (ixtiyoriy)' : profileForm.profile_type === 'web' ? 'Username (Basic Auth ixtiyoriy)' : 'Username (SSH/Telnet)'} style={inputStyle}/>
-              <input value={profileForm.secret} onChange={e => setProfileForm(p => ({ ...p, secret: e.target.value }))} placeholder={profileForm.profile_type === 'snmp' ? 'Community' : profileForm.profile_type === 'web' ? 'Password (Basic Auth ixtiyoriy)' : 'Password'} type="password" style={inputStyle}/>
-              <input value={profileForm.network_label} onChange={e => setProfileForm(p => ({ ...p, network_label: e.target.value }))} placeholder="Tarmoq label/SSID" style={inputStyle}/>
-              <select value={profileForm.snmp_version} onChange={e => setProfileForm(p => ({ ...p, snmp_version: e.target.value }))} style={inputStyle} disabled={profileForm.profile_type !== 'snmp'}>
-                <option value="2c">SNMP v2c</option>
-              </select>
-            </div>
-            <textarea value={profileForm.notes} onChange={e => setProfileForm(p => ({ ...p, notes: e.target.value }))} placeholder="Izoh" style={{ ...inputStyle, marginTop: 10, height: 70, resize: 'vertical' }}/>
-            <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
-              <button className="action-btn" onClick={createProfile}>PROFIL SAQLASH</button>
-              <span style={{ color: '#4a6a84', fontSize: 12 }}>
-                Credential tanlangan interface bilan ishlatiladi: {selectedInterface || '-'}
-              </span>
-            </div>
-            {profileForm.profile_type === 'web' && (
-              <div style={{ color: cyanDim, fontSize: 12, marginTop: 10 }}>
-                `WEB/HTTP` router va admin panel uchun xavfsiz probe qiladi: sarlavha, title, status, auth va latency ko&apos;rsatiladi.
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>PROFIL NOMI</div>
+                <input value={profileForm.name}
+                  onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder={`Mening ${profileForm.profile_type.toUpperCase()} profilim`}
+                  style={inputStyle}/>
               </div>
-            )}
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>PROTOKOL TURI</div>
+                <select value={profileForm.profile_type}
+                  onChange={e => setProfileForm(p => ({ ...p, profile_type: e.target.value, port: getDefaultProfilePort(e.target.value) }))}
+                  style={inputStyle}>
+                  <option value="ssh">SSH (port 22) — Linux/router</option>
+                  <option value="telnet">Telnet (port 23) — Eski qurilmalar</option>
+                  <option value="snmp">SNMP (port 161) — Monitoring</option>
+                  <option value="web">WEB/HTTP (port 80) — Admin panel</option>
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>
+                  TARGET IP (router yoki qurilma IP si)
+                </div>
+                <input value={profileForm.target_host}
+                  onChange={e => setProfileForm(p => ({ ...p, target_host: e.target.value }))}
+                  placeholder="192.168.0.1"
+                  style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>PORT</div>
+                <input value={profileForm.port}
+                  onChange={e => setProfileForm(p => ({ ...p, port: Number(e.target.value || 0) }))}
+                  placeholder={String(getDefaultProfilePort(profileForm.profile_type))}
+                  type="number" style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>
+                  {profileForm.profile_type === 'snmp' ? 'USERNAME (ixtiyoriy)' : 'USERNAME / LOGIN'}
+                </div>
+                <input value={profileForm.username}
+                  onChange={e => setProfileForm(p => ({ ...p, username: e.target.value }))}
+                  placeholder={profileForm.profile_type === 'snmp' ? 'ixtiyoriy' : profileForm.profile_type === 'web' ? 'admin' : 'root yoki admin'}
+                  style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>
+                  {profileForm.profile_type === 'snmp' ? 'COMMUNITY STRING' : 'PASSWORD'}
+                </div>
+                <input value={profileForm.secret}
+                  onChange={e => setProfileForm(p => ({ ...p, secret: e.target.value }))}
+                  placeholder={profileForm.profile_type === 'snmp' ? 'public' : '••••••••'}
+                  type="password" style={inputStyle}/>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>TARMOQ LABEL / SSID</div>
+                <input value={profileForm.network_label}
+                  onChange={e => setProfileForm(p => ({ ...p, network_label: e.target.value }))}
+                  placeholder={selectedInterface || 'Wi-Fi yoki LAN nomi'}
+                  style={inputStyle}/>
+              </div>
+              {profileForm.profile_type === 'snmp' && (
+                <div>
+                  <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 3 }}>SNMP VERSIYASI</div>
+                  <select value={profileForm.snmp_version}
+                    onChange={e => setProfileForm(p => ({ ...p, snmp_version: e.target.value }))}
+                    style={inputStyle}>
+                    <option value="2c">SNMP v2c</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <textarea value={profileForm.notes}
+              onChange={e => setProfileForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="Izoh: masalan 'Uy routeri', 'Ofis switch #2'..."
+              style={{ ...inputStyle, marginTop: 10, height: 55, resize: 'vertical' }}/>
+            <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button className="action-btn" onClick={createProfile}>PROFIL SAQLASH</button>
+              <span style={{ color: '#4a6a84', fontSize: 11 }}>
+                Saqlangandan keyin → <span style={{ color: purple }}>"RUN SCAN"</span> bosib ulanish tekshiriladi
+              </span>
+              <span style={{ color: '#4a6a84', fontSize: 11 }}>| Interface: <span style={{ color: cyan }}>{selectedInterface || '-'}</span></span>
+            </div>
             {profileError && <div style={{ color: redSoft, fontSize: 12, marginTop: 10 }}>{profileError}</div>}
           </div>
         </Panel>
@@ -3892,6 +3992,370 @@ function demoDevices() {
   ];
 }
 
+// ── ISO alpha-2 → numeric country code (topojson world-atlas IDs) ────────
+const ISO_A2_TO_N = {
+  AF:4,AX:8,AL:8,DZ:12,AS:16,AD:20,AO:24,AI:660,AQ:10,AG:28,AR:32,AM:51,AW:533,AU:36,AT:40,AZ:31,
+  BS:44,BH:48,BD:50,BB:52,BY:112,BE:56,BZ:84,BJ:204,BM:60,BT:64,BO:68,BQ:535,BA:70,BW:72,BV:74,
+  BR:76,IO:86,BN:96,BG:100,BF:854,BI:108,CV:132,KH:116,CM:120,CA:124,KY:136,CF:140,TD:148,CL:152,
+  CN:156,CX:162,CC:166,CO:170,KM:174,CG:178,CD:180,CK:184,CR:188,CI:384,HR:191,CU:192,CW:531,
+  CY:196,CZ:203,DK:208,DJ:262,DM:212,DO:214,EC:218,EG:818,SV:222,GQ:226,ER:232,EE:233,SZ:748,
+  ET:231,FK:238,FO:234,FJ:242,FI:246,FR:250,GF:254,PF:258,TF:260,GA:266,GM:270,GE:268,DE:276,
+  GH:288,GI:292,GR:300,GL:304,GD:308,GP:312,GU:316,GT:320,GG:831,GN:324,GW:624,GY:328,HT:332,
+  HM:334,VA:336,HN:340,HK:344,HU:348,IS:352,IN:356,ID:360,IR:364,IQ:368,IE:372,IM:833,IL:376,
+  IT:380,JM:388,JP:392,JE:832,JO:400,KZ:398,KE:404,KI:296,KP:408,KR:410,KW:414,KG:417,LA:418,
+  LV:428,LB:422,LS:426,LR:430,LY:434,LI:438,LT:440,LU:442,MO:446,MG:450,MW:454,MY:458,MV:462,
+  ML:466,MT:470,MH:584,MQ:474,MR:478,MU:480,YT:175,MX:484,FM:583,MD:498,MC:492,MN:496,ME:499,
+  MS:500,MA:504,MZ:508,MM:104,NA:516,NR:520,NP:524,NL:528,NC:540,NZ:554,NI:558,NE:562,NG:566,
+  NU:570,NF:574,MK:807,MP:580,NO:578,OM:512,PK:586,PW:585,PS:275,PA:591,PG:598,PY:600,PE:604,
+  PH:608,PN:612,PL:616,PT:620,PR:630,QA:634,RE:638,RO:642,RU:643,RW:646,BL:652,SH:654,KN:659,
+  LC:662,MF:663,PM:666,VC:670,WS:882,SM:674,ST:678,SA:682,SN:686,RS:688,SC:690,SL:694,SG:702,
+  SX:534,SK:703,SI:705,SB:90,SO:706,ZA:710,GS:239,SS:728,ES:724,LK:144,SD:729,SR:740,SJ:744,
+  SE:752,CH:756,SY:760,TW:158,TJ:762,TZ:834,TH:764,TL:626,TG:768,TK:772,TO:776,TT:780,TN:788,
+  TR:792,TM:795,TC:796,TV:798,UG:800,UA:804,AE:784,GB:826,US:840,UM:581,UY:858,UZ:860,VU:548,
+  VE:862,VN:704,VG:92,VI:850,WF:876,EH:732,YE:887,ZM:894,ZW:716,
+};
+
+// ── 3D GLOBE CANVAS ───────────────────────────────────────────────────────
+function GlobeCanvas({ countryCode, lat, lon }) {
+  const canvasRef = React.useRef(null);
+  const centerRef = React.useRef({ lat: 20, lon: 0 });
+  const dragRef = React.useRef(null);
+  const topoRef = React.useRef(null);
+  const animRef = React.useRef(null);
+  const targetNumeric = ISO_A2_TO_N[countryCode] ? String(ISO_A2_TO_N[countryCode]) : null;
+
+  React.useEffect(() => {
+    if (lat != null && lon != null) {
+      centerRef.current = { lat: lat * 0.8, lon: lon };
+    }
+  }, [lat, lon]);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function loadTopo() {
+      if (topoRef.current) return topoRef.current;
+      // Load topojson-client from CDN
+      if (!window.topojson) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+      const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+      const topo = await resp.json();
+      topoRef.current = window.topojson.feature(topo, topo.objects.countries);
+      return topoRef.current;
+    }
+
+    function project(centerLat, centerLon, featureLat, featureLon, cx, cy, r) {
+      const cLat = centerLat * Math.PI / 180;
+      const cLon = centerLon * Math.PI / 180;
+      const fLat = featureLat * Math.PI / 180;
+      const fLon = featureLon * Math.PI / 180;
+      const cosC = Math.sin(cLat) * Math.sin(fLat) + Math.cos(cLat) * Math.cos(fLat) * Math.cos(fLon - cLon);
+      if (cosC < 0) return null;
+      const x = Math.cos(fLat) * Math.sin(fLon - cLon);
+      const y = Math.cos(cLat) * Math.sin(fLat) - Math.sin(cLat) * Math.cos(fLat) * Math.cos(fLon - cLon);
+      return [cx + r * x, cy - r * y];
+    }
+
+    function drawFrame(geoJson) {
+      const canvas = canvasRef.current;
+      if (!canvas || !mounted) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const cx = W / 2, cy = H / 2;
+      const r = Math.min(W, H) / 2 - 8;
+      const cLat = centerRef.current.lat;
+      const cLon = centerRef.current.lon;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Ocean
+      const grad = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+      grad.addColorStop(0, '#0a1628');
+      grad.addColorStop(1, '#000a14');
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Grid lines
+      ctx.strokeStyle = '#0d2a3a';
+      ctx.lineWidth = 0.5;
+      for (let gridLat = -80; gridLat <= 80; gridLat += 20) {
+        ctx.beginPath();
+        let first = true;
+        for (let gridLon = -180; gridLon <= 180; gridLon += 2) {
+          const p = project(cLat, cLon, gridLat, gridLon, cx, cy, r);
+          if (!p) { first = true; continue; }
+          first ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]);
+          first = false;
+        }
+        ctx.stroke();
+      }
+      for (let gridLon = -180; gridLon <= 180; gridLon += 30) {
+        ctx.beginPath();
+        let first = true;
+        for (let gridLat = -90; gridLat <= 90; gridLat += 2) {
+          const p = project(cLat, cLon, gridLat, gridLon, cx, cy, r);
+          if (!p) { first = true; continue; }
+          first ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]);
+          first = false;
+        }
+        ctx.stroke();
+      }
+
+      // Countries
+      geoJson.features.forEach(feature => {
+        const isTarget = targetNumeric && feature.id === targetNumeric;
+        ctx.fillStyle = isTarget ? 'rgba(255,23,68,0.85)' : '#0d3a1e';
+        ctx.strokeStyle = isTarget ? '#ff1744' : '#39ff1433';
+        ctx.lineWidth = isTarget ? 1.2 : 0.6;
+
+        const geom = feature.geometry;
+        const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+        polys.forEach(poly => {
+          poly.forEach(ring => {
+            ctx.beginPath();
+            let first = true;
+            ring.forEach(([pLon, pLat]) => {
+              const p = project(cLat, cLon, pLat, pLon, cx, cy, r);
+              if (!p) { first = true; return; }
+              first ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]);
+              first = false;
+            });
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          });
+        });
+      });
+
+      // Globe border
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#39ff1422';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Pulsing dot at target location
+      if (lat != null && lon != null) {
+        const p = project(cLat, cLon, lat, lon, cx, cy, r);
+        if (p) {
+          const pulse = (Math.sin(Date.now() / 400) + 1) / 2;
+          const dotR = 5 + pulse * 4;
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], dotR, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,23,68,${0.3 + pulse * 0.4})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(p[0], p[1], 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff1744';
+          ctx.fill();
+        }
+      }
+    }
+
+    let geoJson = null;
+    loadTopo().then(geo => {
+      if (!mounted) return;
+      geoJson = geo;
+      function loop() {
+        if (!mounted) return;
+        if (!dragRef.current) {
+          centerRef.current = { ...centerRef.current, lon: centerRef.current.lon + 0.15 };
+        }
+        if (geoJson) drawFrame(geoJson);
+        animRef.current = requestAnimationFrame(loop);
+      }
+      loop();
+    }).catch(() => {});
+
+    return () => {
+      mounted = false;
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    };
+  }, [countryCode, lat, lon]);
+
+  function onMouseDown(e) {
+    dragRef.current = { x: e.clientX, y: e.clientY, lat: centerRef.current.lat, lon: centerRef.current.lon };
+  }
+  function onMouseMove(e) {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    const dy = e.clientY - dragRef.current.y;
+    centerRef.current = {
+      lon: dragRef.current.lon + dx * 0.4,
+      lat: Math.max(-85, Math.min(85, dragRef.current.lat - dy * 0.4)),
+    };
+  }
+  function onMouseUp() { dragRef.current = null; }
+
+  function onTouchStart(e) {
+    const t = e.touches[0];
+    dragRef.current = { x: t.clientX, y: t.clientY, lat: centerRef.current.lat, lon: centerRef.current.lon };
+  }
+  function onTouchMove(e) {
+    if (!dragRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - dragRef.current.x;
+    const dy = t.clientY - dragRef.current.y;
+    centerRef.current = {
+      lon: dragRef.current.lon + dx * 0.4,
+      lat: Math.max(-85, Math.min(85, dragRef.current.lat - dy * 0.4)),
+    };
+  }
+  function onTouchEnd() { dragRef.current = null; }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0' }}>
+      <div style={{ fontSize: 10, color: '#4a6a84', marginBottom: 8, fontFamily: 'Share Tech Mono' }}>
+        SICHQONCHA BILAN AYLANTIRING · {countryCode ? `JOYLASHUV: ${countryCode}` : ''}
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={420}
+        height={420}
+        style={{ cursor: 'grab', borderRadius: '50%', display: 'block', boxShadow: '0 0 40px #39ff1422' }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      />
+    </div>
+  );
+}
+
+// ── WORLD SUBMARINE CABLE MAP ─────────────────────────────────────────────
+function WorldCableMap() {
+  // Mercator projection: lon→x, lat→y
+  const W = 900, H = 480;
+  function mx(lon) { return ((lon + 180) / 360) * W; }
+  function my(lat) {
+    const r = Math.PI / 180;
+    const y = Math.log(Math.tan(Math.PI / 4 + lat * r / 2));
+    return H / 2 - (y / (2 * Math.PI)) * H * 2.2;
+  }
+  function path(coords) {
+    return coords.map(([lon, lat], i) => `${i === 0 ? 'M' : 'L'}${mx(lon).toFixed(1)},${my(lat).toFixed(1)}`).join(' ');
+  }
+
+  const cables = [
+    // Atlantic
+    { name: 'TAT-14',      pts: [[-74,40],[-10,53],[-6,53]] },
+    { name: 'MAREA',       pts: [[-76,37],[-8,38]] },
+    { name: 'AEConnect',   pts: [[-74,41],[-6,51]] },
+    { name: 'Hibernia',    pts: [[-52,46],[-12,53]] },
+    { name: 'FLAG A-E-ME', pts: [[-74,40],[33,68],[38,37]] },
+    // Pacific
+    { name: 'Unity/PC-1',  pts: [[-118,34],[139,35]] },
+    { name: 'FASTER',      pts: [[-122,37],[135,35]] },
+    { name: 'Southern Cross', pts: [[-118,34],[-157,21],[-174,-37],[153,-33]] },
+    { name: 'Hawaiki',     pts: [[-119,37],[-157,21],[-170,-14],[174,-37],[153,-33]] },
+    { name: 'AAG',         pts: [[103,1],[121,14],[135,35],[139,35],[-157,21],[-118,34]] },
+    { name: 'JGA',         pts: [[103,1],[130,30],[139,35]] },
+    { name: 'APCN-2',     pts: [[103,1],[114,22],[121,24],[130,33],[135,35]] },
+    { name: 'Pacific Light',pts: [[-118,34],[-157,21],[121,22]] },
+    // Indian Ocean
+    { name: 'SEA-ME-WE 3', pts: [[103,1],[80,9],[70,22],[43,12],[33,12],[28,30],[18,38],[8,37],[-6,35]] },
+    { name: 'SEA-ME-WE 4', pts: [[103,1],[85,13],[72,18],[55,20],[43,12],[33,12],[29,41],[25,37],[12,37],[-6,35]] },
+    { name: 'IMEWE',       pts: [[72,22],[55,20],[43,12],[30,30],[25,37]] },
+    { name: 'FALCON',      pts: [[55,24],[52,26],[40,12],[43,12],[50,24],[55,24]] },
+    { name: 'SAFE',        pts: [[28,33],[18,-34],[40,-22],[55,24]] },
+    { name: 'EASSy',       pts: [[40,11],[37,-3],[32,-26],[28,-34]] },
+    { name: 'SEACOM',      pts: [[43,12],[35,-4],[32,-26],[28,-33],[18,-34]] },
+    // Africa / Atlantic
+    { name: 'ACE',         pts: [[-17,14],[0,4],[-13,-8],[18,-34]] },
+    { name: 'MainOne',     pts: [[-8,37],[3,5],[-13,-8]] },
+    { name: 'SAT-3/WASC',  pts: [[-9,38],[0,4],[-13,-8],[18,-34]] },
+    // Americas
+    { name: 'Americas-I',  pts: [[-74,40],[-67,17],[-46,-23]] },
+    { name: 'SAm-1',       pts: [[-74,40],[-67,17],[-46,-23],[-70,-33]] },
+  ];
+
+  // Simplified continent outlines (very rough polygons for background)
+  const continents = [
+    // North America
+    [[-168,71],[-55,71],[-55,25],[-80,10],[-90,15],[-105,20],[-118,34],[-125,48],[-138,60],[-168,60],[-168,71]],
+    // South America
+    [[-82,10],[-60,10],[-46,-23],[-70,-55],[-76,-52],[-82,10]],
+    // Europe
+    [[28,71],[31,70],[-10,58],[-10,36],[28,36],[36,37],[42,41],[32,46],[28,71]],
+    // Africa
+    [[-18,14],[42,12],[51,12],[44,-11],[35,-35],[18,-35],[-18,14]],
+    // Asia
+    [[26,72],[180,72],[180,0],[103,1],[72,22],[55,24],[36,37],[26,72]],
+    // Australia
+    [[114,-22],[154,-26],[151,-34],[128,-35],[115,-34],[114,-22]],
+    // Japan + SE Asia rough
+    [[129,31],[132,33],[130,33],[129,31]],
+  ];
+
+  return (
+    <div style={{ background: '#000', borderRadius: 6, overflow: 'hidden', border: '1px solid #1a1a1a' }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', display: 'block', background: '#000' }}
+      >
+        {/* Continent fills */}
+        {continents.map((pts, i) => (
+          <path
+            key={i}
+            d={path(pts) + ' Z'}
+            fill="#111"
+            stroke="#222"
+            strokeWidth="0.8"
+          />
+        ))}
+
+        {/* Graticule */}
+        {[-60,-30,0,30,60].map(lat => (
+          <line key={lat} x1={0} y1={my(lat).toFixed(0)} x2={W} y2={my(lat).toFixed(0)}
+            stroke="#1a1a1a" strokeWidth="0.5"/>
+        ))}
+        {[-150,-120,-90,-60,-30,0,30,60,90,120,150].map(lon => (
+          <line key={lon} x1={mx(lon).toFixed(0)} y1={0} x2={mx(lon).toFixed(0)} y2={H}
+            stroke="#1a1a1a" strokeWidth="0.5"/>
+        ))}
+
+        {/* Cables */}
+        {cables.map((c, i) => (
+          <g key={i}>
+            <path d={path(c.pts)} fill="none" stroke="#ff1744" strokeWidth="1.2" strokeOpacity="0.75"/>
+            {/* Landing station dots */}
+            {[c.pts[0], c.pts[c.pts.length - 1]].map(([lon, lat], j) => (
+              <circle key={j} cx={mx(lon).toFixed(1)} cy={my(lat).toFixed(1)} r="2.5" fill="#ff1744" fillOpacity="0.9"/>
+            ))}
+          </g>
+        ))}
+
+        {/* Labels */}
+        {[
+          [[-100,40],'N.AMERICA'],[[- 55,-15],'S.AMERICA'],[[15,50],'EUROPE'],
+          [[20,5],'AFRICA'],[[80,40],'ASIA'],[[135,-25],'AUSTRALIA'],
+        ].map(([[lon,lat],label]) => (
+          <text key={label} x={mx(lon)} y={my(lat)} fill="#333" fontSize="9"
+            fontFamily="Share Tech Mono" textAnchor="middle">{label}</text>
+        ))}
+
+        {/* Legend */}
+        <rect x="10" y="10" width="160" height="28" fill="#000" fillOpacity="0.8" stroke="#222"/>
+        <line x1="16" y1="24" x2="40" y2="24" stroke="#ff1744" strokeWidth="1.5"/>
+        <circle cx="16" cy="24" r="2.5" fill="#ff1744"/>
+        <circle cx="40" cy="24" r="2.5" fill="#ff1744"/>
+        <text x="46" y="27" fill="#666" fontSize="9" fontFamily="Share Tech Mono">SUBMARINE CABLE ROUTES</text>
+      </svg>
+    </div>
+  );
+}
+
 // ── AI LABORATORIYA PAGE ──────────────────────────────────────────────────
 function AILabPage() {
   const [tab, setTab] = useState('performance');
@@ -4745,25 +5209,34 @@ function AILabPage() {
                 return (
                   <div>
                     {geoData.single && (
-                      <div style={{ marginBottom: 14, padding: 16, background: '#39ff1411', border: '1px solid #39ff1444' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                          {[
-                            ['IP', geoData.single.ip],
-                            ['MAMLAKAT', `${geoData.single.country_code} — ${geoData.single.country}`],
-                            ['SHAHAR', `${geoData.single.city || '-'}, ${geoData.single.region || '-'}`],
-                            ['ISP', geoData.single.isp || '-'],
-                            ['KOORDINATLAR', geoData.single.lat ? `${geoData.single.lat?.toFixed(2)}, ${geoData.single.lon?.toFixed(2)}` : '-'],
-                            ['XAVF', geoData.single.risk?.toUpperCase() || '-'],
-                          ].map(([k, v]) => (
-                            <div key={k}>
-                              <div style={{ fontSize: 9, color: '#4a6a84', marginBottom: 2 }}>{k}</div>
-                              <div style={{ fontFamily: 'Share Tech Mono', fontSize: 12, color: k === 'XAVF' ? riskColor(geoData.single.risk) : '#94b4c8' }}>{v}</div>
-                            </div>
-                          ))}
+                      <div>
+                        <div style={{ marginBottom: 14, padding: 16, background: '#39ff1411', border: '1px solid #39ff1444' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                            {[
+                              ['IP', geoData.single.ip],
+                              ['MAMLAKAT', `${geoData.single.country_code} — ${geoData.single.country}`],
+                              ['SHAHAR', `${geoData.single.city || '-'}, ${geoData.single.region || '-'}`],
+                              ['ISP', geoData.single.isp || '-'],
+                              ['KOORDINATLAR', geoData.single.lat ? `${geoData.single.lat?.toFixed(2)}, ${geoData.single.lon?.toFixed(2)}` : '-'],
+                              ['XAVF', geoData.single.risk?.toUpperCase() || '-'],
+                            ].map(([k, v]) => (
+                              <div key={k}>
+                                <div style={{ fontSize: 9, color: '#4a6a84', marginBottom: 2 }}>{k}</div>
+                                <div style={{ fontFamily: 'Share Tech Mono', fontSize: 12, color: k === 'XAVF' ? riskColor(geoData.single.risk) : '#94b4c8' }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+                          {geoData.single.is_proxy && <div style={{ marginTop: 8, color: '#ff1744', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ PROXY / VPN ANIQLANDI</div>}
+                          {geoData.single.is_hosting && <div style={{ marginTop: 4, color: '#ffab00', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ HOSTING / DATACENTER IP</div>}
+                          {geoData.single.error && <div style={{ color: '#ff4444', fontSize: 11 }}>{geoData.single.error}</div>}
                         </div>
-                        {geoData.single.is_proxy && <div style={{ marginTop: 8, color: '#ff1744', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ PROXY / VPN ANIQLANDI</div>}
-                        {geoData.single.is_hosting && <div style={{ marginTop: 4, color: '#ffab00', fontFamily: 'Share Tech Mono', fontSize: 11 }}>⚠ HOSTING / DATACENTER IP</div>}
-                        {geoData.single.error && <div style={{ color: '#ff4444', fontSize: 11 }}>{geoData.single.error}</div>}
+                        {geoData.single.lat != null && (
+                          <GlobeCanvas
+                            countryCode={geoData.single.country_code}
+                            lat={geoData.single.lat}
+                            lon={geoData.single.lon}
+                          />
+                        )}
                       </div>
                     )}
 
@@ -4795,6 +5268,15 @@ function AILabPage() {
                   IP kiriting yoki "BARCHA TAHDIDLAR" tugmasini bosing
                 </div>
               )}
+            </div>
+          </Panel>
+
+          <Panel title="GLOBAL SUBMARINE CABLE MAP — DUNYO KABEL TARMOG'I" color="#ff1744">
+            <div className="panel-body" style={{ paddingTop: 10, paddingBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#94b4c8', lineHeight: 1.7, marginBottom: 10 }}>
+                Dunyo bo'ylab suv osti fiber-optik kabellari. Qizil chiziqlar — asosiy magistral yo'nalishlar. Nuqtalar — quruqlikka chiqish joylari (landing stations).
+              </div>
+              <WorldCableMap />
             </div>
           </Panel>
         </div>
@@ -5243,7 +5725,19 @@ function ReportsPage() {
   const [incLoading, setIncLoading] = useState(false);
   const [correlating, setCorrelating] = useState(false);
   const [corrMsg, setCorrMsg] = useState('');
+  const [migrateMsg, setMigrateMsg] = useState('');
+  const [migrateLoading, setMigrateLoading] = useState(false);
   const accent = themeAccent('cyan', '#00e5ff');
+
+  const runMigrate = async () => {
+    setMigrateLoading(true); setMigrateMsg('');
+    try {
+      const res = await api.runMigration();
+      setMigrateMsg(res.success ? `✓ ${res.output?.trim() || "Barcha migrationlar qo'llandi"}` : `⚠ ${res.error}`);
+      if (res.success) loadIncidents();
+    } catch (e) { setMigrateMsg('Xato: ' + e.message); }
+    setMigrateLoading(false);
+  };
 
   useEffect(() => { loadIncidents(); }, []);
 
@@ -5272,6 +5766,24 @@ function ReportsPage() {
 
   return (
     <div style={{ animation: 'fadeUp .3s ease' }}>
+      {/* ── DATABASE MIGRATION TRIGGER ── */}
+      <div style={{ marginBottom: 14, padding: '10px 16px', background: 'rgba(255,171,0,.06)', border: '1px solid rgba(255,171,0,.3)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00' }}>⚠ JADVAL XATOSI BO'LSA:</span>
+        <button
+          className="action-btn"
+          style={{ padding: '6px 16px', fontSize: 11, borderColor: '#ffab0066', color: '#ffab00' }}
+          onClick={runMigrate}
+          disabled={migrateLoading}
+        >
+          {migrateLoading ? 'QABUL QILINMOQDA...' : 'DB MIGRATIONLARNI QABUL QILISH'}
+        </button>
+        {migrateMsg && (
+          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: migrateMsg.startsWith('✓') ? '#39ff14' : '#ff4444', flex: 1 }}>
+            {migrateMsg}
+          </span>
+        )}
+      </div>
+
       {/* Export cards */}
       <Panel title="MA'LUMOTLARNI EKSPORT QILISH" color={accent} style={{ marginBottom: 14 }}>
         <div className="panel-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, paddingTop: 14, paddingBottom: 14 }}>
