@@ -4235,122 +4235,153 @@ function GlobeCanvas({ countryCode, lat, lon }) {
 
 // ── WORLD SUBMARINE CABLE MAP ─────────────────────────────────────────────
 function WorldCableMap() {
-  // Mercator projection: lon→x, lat→y
-  const W = 900, H = 480;
-  function mx(lon) { return ((lon + 180) / 360) * W; }
-  function my(lat) {
-    const r = Math.PI / 180;
-    const y = Math.log(Math.tan(Math.PI / 4 + lat * r / 2));
-    return H / 2 - (y / (2 * Math.PI)) * H * 2.2;
+  const W = 960, H = 500;
+  const MAX_LAT = 83;
+  const [countryPaths, setCountryPaths] = React.useState([]);
+  const [loaded, setLoaded] = React.useState(false);
+
+  // Proper Mercator: fits ±83° exactly into H
+  const mercMax = Math.log(Math.tan(Math.PI / 4 + MAX_LAT * Math.PI / 360));
+  function px(lon, lat) {
+    const clat = Math.max(-MAX_LAT, Math.min(MAX_LAT, lat));
+    const x = ((lon + 180) / 360) * W;
+    const mercN = Math.log(Math.tan(Math.PI / 4 + clat * Math.PI / 360));
+    const y = H / 2 - (mercN / (2 * mercMax)) * H * 0.98;
+    return [+x.toFixed(1), +y.toFixed(1)];
   }
-  function path(coords) {
-    return coords.map(([lon, lat], i) => `${i === 0 ? 'M' : 'L'}${mx(lon).toFixed(1)},${my(lat).toFixed(1)}`).join(' ');
-  }
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        if (!window.topojson) {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        const resp = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+        const topo = await resp.json();
+        const geo = window.topojson.feature(topo, topo.objects.countries);
+        const built = geo.features.map(f => {
+          const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+          return polys.map(poly =>
+            poly.map(ring =>
+              ring.map(([lon, lat], i) => {
+                const [x, y] = px(lon, lat);
+                return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+              }).join(' ') + ' Z'
+            ).join(' ')
+          ).join(' ');
+        });
+        setCountryPaths(built);
+        setLoaded(true);
+      } catch (e) { setLoaded(true); }
+    }
+    load();
+  }, []);
 
   const cables = [
-    // Atlantic
-    { name: 'TAT-14',      pts: [[-74,40],[-10,53],[-6,53]] },
-    { name: 'MAREA',       pts: [[-76,37],[-8,38]] },
-    { name: 'AEConnect',   pts: [[-74,41],[-6,51]] },
-    { name: 'Hibernia',    pts: [[-52,46],[-12,53]] },
-    { name: 'FLAG A-E-ME', pts: [[-74,40],[33,68],[38,37]] },
-    // Pacific
-    { name: 'Unity/PC-1',  pts: [[-118,34],[139,35]] },
-    { name: 'FASTER',      pts: [[-122,37],[135,35]] },
-    { name: 'Southern Cross', pts: [[-118,34],[-157,21],[-174,-37],[153,-33]] },
-    { name: 'Hawaiki',     pts: [[-119,37],[-157,21],[-170,-14],[174,-37],[153,-33]] },
-    { name: 'AAG',         pts: [[103,1],[121,14],[135,35],[139,35],[-157,21],[-118,34]] },
-    { name: 'JGA',         pts: [[103,1],[130,30],[139,35]] },
-    { name: 'APCN-2',     pts: [[103,1],[114,22],[121,24],[130,33],[135,35]] },
-    { name: 'Pacific Light',pts: [[-118,34],[-157,21],[121,22]] },
-    // Indian Ocean
-    { name: 'SEA-ME-WE 3', pts: [[103,1],[80,9],[70,22],[43,12],[33,12],[28,30],[18,38],[8,37],[-6,35]] },
-    { name: 'SEA-ME-WE 4', pts: [[103,1],[85,13],[72,18],[55,20],[43,12],[33,12],[29,41],[25,37],[12,37],[-6,35]] },
-    { name: 'IMEWE',       pts: [[72,22],[55,20],[43,12],[30,30],[25,37]] },
-    { name: 'FALCON',      pts: [[55,24],[52,26],[40,12],[43,12],[50,24],[55,24]] },
-    { name: 'SAFE',        pts: [[28,33],[18,-34],[40,-22],[55,24]] },
-    { name: 'EASSy',       pts: [[40,11],[37,-3],[32,-26],[28,-34]] },
-    { name: 'SEACOM',      pts: [[43,12],[35,-4],[32,-26],[28,-33],[18,-34]] },
-    // Africa / Atlantic
-    { name: 'ACE',         pts: [[-17,14],[0,4],[-13,-8],[18,-34]] },
-    { name: 'MainOne',     pts: [[-8,37],[3,5],[-13,-8]] },
-    { name: 'SAT-3/WASC',  pts: [[-9,38],[0,4],[-13,-8],[18,-34]] },
-    // Americas
-    { name: 'Americas-I',  pts: [[-74,40],[-67,17],[-46,-23]] },
-    { name: 'SAm-1',       pts: [[-74,40],[-67,17],[-46,-23],[-70,-33]] },
+    // ─── Atlantic ─────────────────────────────────────────────────────
+    { pts: [[-74,40],[-10,53],[-6,53]] },
+    { pts: [[-76,37],[-8,38]] },
+    { pts: [[-74,41],[-8,51]] },
+    { pts: [[-52,47],[-8,52]] },
+    { pts: [[-74,40],[-46,-23]] },
+    { pts: [[-74,40],[-67,17],[-46,-23],[-70,-33]] },
+    // ─── Pacific ──────────────────────────────────────────────────────
+    { pts: [[-118,34],[139,35]] },
+    { pts: [[-122,37],[135,35]] },
+    { pts: [[-118,34],[-157,21],[-175,-38],[153,-33]] },
+    { pts: [[-119,37],[-157,21],[-170,-14],[174,-37],[153,-33]] },
+    { pts: [[-118,34],[-157,21],[121,22]] },
+    { pts: [[103,1],[121,14],[135,35],[139,35],[-157,21],[-118,34]] },
+    { pts: [[103,1],[130,30],[139,35]] },
+    { pts: [[103,1],[114,22],[121,24],[130,33],[135,35]] },
+    // ─── Indian Ocean / Middle East ───────────────────────────────────
+    { pts: [[103,1],[80,9],[70,22],[43,12],[33,12],[28,30],[18,38],[8,37],[-6,35]] },
+    { pts: [[103,1],[85,13],[72,18],[55,20],[43,12],[33,12],[29,41],[25,37],[12,37],[-6,35]] },
+    { pts: [[72,22],[55,20],[43,12],[30,30],[25,37]] },
+    { pts: [[57,24],[43,12],[40,12],[50,23],[57,24]] },
+    { pts: [[28,33],[18,-34],[40,-22],[55,24]] },
+    // ─── East / South Africa ──────────────────────────────────────────
+    { pts: [[40,11],[37,-3],[33,-26],[28,-34]] },
+    { pts: [[43,12],[35,-4],[33,-26],[28,-33],[18,-34]] },
+    // ─── West Africa / Atlantic ───────────────────────────────────────
+    { pts: [[-17,14],[0,4],[-13,-8],[18,-34]] },
+    { pts: [[-8,37],[3,5],[-13,-8]] },
+    { pts: [[-9,38],[3,5],[-13,-8],[18,-34]] },
+    // ─── Intra-Asia ───────────────────────────────────────────────────
+    { pts: [[103,1],[80,13],[72,22]] },
+    { pts: [[100,20],[110,20],[121,25],[139,35]] },
   ];
 
-  // Simplified continent outlines (very rough polygons for background)
-  const continents = [
-    // North America
-    [[-168,71],[-55,71],[-55,25],[-80,10],[-90,15],[-105,20],[-118,34],[-125,48],[-138,60],[-168,60],[-168,71]],
-    // South America
-    [[-82,10],[-60,10],[-46,-23],[-70,-55],[-76,-52],[-82,10]],
-    // Europe
-    [[28,71],[31,70],[-10,58],[-10,36],[28,36],[36,37],[42,41],[32,46],[28,71]],
-    // Africa
-    [[-18,14],[42,12],[51,12],[44,-11],[35,-35],[18,-35],[-18,14]],
-    // Asia
-    [[26,72],[180,72],[180,0],[103,1],[72,22],[55,24],[36,37],[26,72]],
-    // Australia
-    [[114,-22],[154,-26],[151,-34],[128,-35],[115,-34],[114,-22]],
-    // Japan + SE Asia rough
-    [[129,31],[132,33],[130,33],[129,31]],
+  const labels = [
+    [[-100,40],'N.AMERICA'],[[-58,-15],'S.AMERICA'],[[15,50],'EUROPE'],
+    [[22,5],'AFRICA'],[[85,40],'ASIA'],[[134,-25],'AUSTRALIA'],
   ];
 
   return (
-    <div style={{ background: '#000', borderRadius: 6, overflow: 'hidden', border: '1px solid #1a1a1a' }}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', display: 'block', background: '#000' }}
-      >
-        {/* Continent fills */}
-        {continents.map((pts, i) => (
-          <path
-            key={i}
-            d={path(pts) + ' Z'}
-            fill="#111"
-            stroke="#222"
-            strokeWidth="0.8"
-          />
-        ))}
+    <div style={{ position: 'relative', background: '#000', borderRadius: 6, overflow: 'hidden', border: '1px solid #1e1e1e' }}>
+      {!loaded && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+          <div className="spinner"/>
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+        {/* Ocean */}
+        <rect width={W} height={H} fill="#020c18"/>
 
         {/* Graticule */}
-        {[-60,-30,0,30,60].map(lat => (
-          <line key={lat} x1={0} y1={my(lat).toFixed(0)} x2={W} y2={my(lat).toFixed(0)}
-            stroke="#1a1a1a" strokeWidth="0.5"/>
-        ))}
-        {[-150,-120,-90,-60,-30,0,30,60,90,120,150].map(lon => (
-          <line key={lon} x1={mx(lon).toFixed(0)} y1={0} x2={mx(lon).toFixed(0)} y2={H}
-            stroke="#1a1a1a" strokeWidth="0.5"/>
+        {[-60,-30,0,30,60].map(lat => {
+          const [,y] = px(0, lat);
+          return <line key={lat} x1={0} y1={y} x2={W} y2={y} stroke="#0c1e2a" strokeWidth="0.6"/>;
+        })}
+        {[-150,-120,-90,-60,-30,0,30,60,90,120,150,180].map(lon => {
+          const [x] = px(lon, 0);
+          return <line key={lon} x1={x} y1={0} x2={x} y2={H} stroke="#0c1e2a" strokeWidth="0.6"/>;
+        })}
+
+        {/* Countries from real topojson */}
+        {countryPaths.map((d, i) => (
+          <path key={i} d={d} fill="#0c1f0e" stroke="#1a3a1a" strokeWidth="0.45"/>
         ))}
 
-        {/* Cables */}
-        {cables.map((c, i) => (
-          <g key={i}>
-            <path d={path(c.pts)} fill="none" stroke="#ff1744" strokeWidth="1.2" strokeOpacity="0.75"/>
-            {/* Landing station dots */}
-            {[c.pts[0], c.pts[c.pts.length - 1]].map(([lon, lat], j) => (
-              <circle key={j} cx={mx(lon).toFixed(1)} cy={my(lat).toFixed(1)} r="2.5" fill="#ff1744" fillOpacity="0.9"/>
-            ))}
-          </g>
-        ))}
+        {/* Cables — glow layer then solid */}
+        {cables.map((c, i) => {
+          const d = c.pts.map(([lon, lat], j) => {
+            const [x, y] = px(lon, lat);
+            return `${j === 0 ? 'M' : 'L'}${x},${y}`;
+          }).join(' ');
+          return (
+            <g key={i}>
+              <path d={d} fill="none" stroke="#ff1744" strokeWidth="3" strokeOpacity="0.15" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d={d} fill="none" stroke="#ff1744" strokeWidth="1.3" strokeOpacity="0.82" strokeLinecap="round" strokeLinejoin="round"/>
+            </g>
+          );
+        })}
 
-        {/* Labels */}
-        {[
-          [[-100,40],'N.AMERICA'],[[- 55,-15],'S.AMERICA'],[[15,50],'EUROPE'],
-          [[20,5],'AFRICA'],[[80,40],'ASIA'],[[135,-25],'AUSTRALIA'],
-        ].map(([[lon,lat],label]) => (
-          <text key={label} x={mx(lon)} y={my(lat)} fill="#333" fontSize="9"
-            fontFamily="Share Tech Mono" textAnchor="middle">{label}</text>
-        ))}
+        {/* Landing station dots */}
+        {cables.map((c, i) =>
+          [c.pts[0], c.pts[c.pts.length - 1]].map(([lon, lat], j) => {
+            const [x, y] = px(lon, lat);
+            return <circle key={`${i}-${j}`} cx={x} cy={y} r="2.8" fill="#ff1744" fillOpacity="0.95"/>;
+          })
+        )}
+
+        {/* Continent labels */}
+        {labels.map(([[lon,lat],label]) => {
+          const [x, y] = px(lon, lat);
+          return <text key={label} x={x} y={y} fill="#2a3a2a" fontSize="11" fontFamily="Share Tech Mono" textAnchor="middle" fontWeight="bold">{label}</text>;
+        })}
 
         {/* Legend */}
-        <rect x="10" y="10" width="160" height="28" fill="#000" fillOpacity="0.8" stroke="#222"/>
-        <line x1="16" y1="24" x2="40" y2="24" stroke="#ff1744" strokeWidth="1.5"/>
-        <circle cx="16" cy="24" r="2.5" fill="#ff1744"/>
-        <circle cx="40" cy="24" r="2.5" fill="#ff1744"/>
-        <text x="46" y="27" fill="#666" fontSize="9" fontFamily="Share Tech Mono">SUBMARINE CABLE ROUTES</text>
+        <rect x="8" y="8" width="196" height="26" fill="#000" fillOpacity="0.75" stroke="#1e1e1e" rx="2"/>
+        <line x1="14" y1="21" x2="42" y2="21" stroke="#ff1744" strokeWidth="1.5"/>
+        <circle cx="14" cy="21" r="2.5" fill="#ff1744"/>
+        <circle cx="42" cy="21" r="2.5" fill="#ff1744"/>
+        <text x="48" y="25" fill="#4a4a4a" fontSize="9" fontFamily="Share Tech Mono">SUBMARINE CABLE ROUTES ({cables.length})</text>
       </svg>
     </div>
   );
