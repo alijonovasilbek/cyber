@@ -3,6 +3,78 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
+const FONT_BUMP_PX = 2
+
+function readExplicitFontSize(element) {
+  if (!(element instanceof HTMLElement || element instanceof SVGElement)) return null
+
+  if (element.style?.fontSize) return element.style.fontSize
+
+  const svgFontSize = element.getAttribute?.('font-size')
+  if (svgFontSize) return svgFontSize
+
+  return null
+}
+
+function bumpExplicitFontSize(element) {
+  const explicitFontSize = readExplicitFontSize(element)
+  if (!explicitFontSize) return
+
+  const tagName = element.tagName?.toLowerCase?.()
+  if (['script', 'style', 'link', 'meta', 'path'].includes(tagName)) return
+
+  const baseSize = Number.parseFloat(element.dataset.cgFontBumpBase || explicitFontSize)
+  if (!Number.isFinite(baseSize) || baseSize <= 0) return
+
+  element.dataset.cgFontBumpBase = String(baseSize)
+  element.style.fontSize = `${baseSize + FONT_BUMP_PX}px`
+}
+
+function applyFontBump(root) {
+  if (!(root instanceof HTMLElement || root instanceof SVGElement)) return
+
+  bumpExplicitFontSize(root)
+  root.querySelectorAll?.('*').forEach(bumpExplicitFontSize)
+}
+
+function GlobalFontBump() {
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+
+    applyFontBump(document.body)
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLElement || node instanceof SVGElement) {
+              applyFontBump(node)
+            }
+          })
+        }
+
+        if (
+          mutation.type === 'attributes' &&
+          (mutation.target instanceof HTMLElement || mutation.target instanceof SVGElement)
+        ) {
+          bumpExplicitFontSize(mutation.target)
+        }
+      })
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'font-size'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  return null
+}
+
 class AppErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
@@ -55,6 +127,7 @@ class AppErrorBoundary extends React.Component {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <GlobalFontBump />
     <AppErrorBoundary>
       <App />
     </AppErrorBoundary>

@@ -12,3 +12,4 @@ pyasn1==0.4.8
 psycopg2-binary==2.9.9
 uvicorn==0.30.6
 reportlab>=4.0.0
+pywin32>=311

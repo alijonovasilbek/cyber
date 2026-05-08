@@ -2,14 +2,14 @@ const ENV_API_ORIGIN = (import.meta.env.VITE_API_ORIGIN || '').trim();
 const API_HOST = ENV_API_ORIGIN
   ? (ENV_API_ORIGIN === 'same-origin' ? '' : ENV_API_ORIGIN.replace(/\/$/, ''))
   : (typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname || '127.0.0.1'}:8000`
-      : 'http://127.0.0.1:8000');
+      ? `${window.location.protocol}//${window.location.hostname || '127.0.0.1'}:8001`
+      : 'http://127.0.0.1:8001');
 const BASE = API_HOST ? `${API_HOST}/api` : '/api';
 const WS_BASE = API_HOST
   ? API_HOST.replace('http://', 'ws://').replace('https://', 'wss://')
   : (typeof window !== 'undefined'
       ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`
-      : 'ws://127.0.0.1:8000');
+      : 'ws://127.0.0.1:8001');
 const LOCAL_AGENT_BASE = 'http://127.0.0.1:8765';
 let localAgentCache = { value: false, expiresAt: 0 };
 
@@ -133,6 +133,7 @@ const post = (url, body) => request(url, {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+const del = url => request(url, { method: 'DELETE' });
 
 async function localAgentRequest(path, options = {}) {
   const response = await fetch(`${LOCAL_AGENT_BASE}${path}`, options);
@@ -268,4 +269,25 @@ export const api = {
   testTelegram: data => post('/telegram/test/', data),
   getUserBehavior: () => get('/behavior/'),
   runMigration: () => post('/run-migration/', {}),
+  // ── ML Lab (eski) ─────────────────────────────────────────────────────────
+  labSimulate: data => post('/lab/simulate/', data),
+  labGetDataset: (attack_type = 'ddos') => get(`/lab/dataset/?attack_type=${attack_type}`),
+  labClearDataset: (attack_type = 'ddos') => del(`/lab/dataset/?attack_type=${attack_type}`),
+  labTrain: data => post('/lab/train/', data),
+  labPredict: data => post('/lab/predict/', data),
+  labStatus: () => get('/lab/status/'),
+  // ── Thesis: AI Bashorat tizimi ────────────────────────────────────────────
+  labPredict2:       ()     => get('/lab/predict/'),
+  labMetrics:        ()     => get('/lab/metrics/'),
+  labWindows:        (n=60) => get(`/lab/windows/?limit=${n}`),
+  labRunSim:         type   => post('/lab/simulate/', { type }),
+  labStartTrain:     ()     => post('/lab/train/', {}),
+  labTrainStatus:    ()     => get('/lab/train/status/'),
+  labGenDataset:     opts   => post('/lab/dataset/generate/', opts),
+  labExportCsvUrl:        ()  => `${BASE}/lab/windows/export/`,
+  labExportHistoryCsvUrl: ()  => `${BASE}/lab/history/export/`,
+  labReportPdfUrl:        ()  => `${BASE}/lab/report/pdf/`,
+  labCollect:        label  => post('/lab/collect/', { label: label || 'normal' }),
+  labHistory:        (n=50) => get(`/lab/history/?limit=${n}`),
+  labScenario:       type   => post('/lab/scenario/', { type }),
 };

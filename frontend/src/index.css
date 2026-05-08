@@ -51,7 +51,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
-  font-size: 15px;
+  font-size: 17px;
   transition: background .25s ease, color .25s ease;
 }
 .mono { font-family: 'Share Tech Mono', monospace; }
