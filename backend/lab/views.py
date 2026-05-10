@@ -1,5 +1,7 @@
 import csv
 import io
+import os
+import platform
 import threading
 import logging
 from datetime import datetime
@@ -11,6 +13,18 @@ from rest_framework.response import Response
 from .models import LogWindow, TrainSession, PredictionLog
 
 logger = logging.getLogger(__name__)
+
+
+def _smart_collect(label='auto', minutes=5):
+    """Platform va muhitga qarab to'g'ri collector ni ishlatadi."""
+    victim_log = os.environ.get('VICTIM_LOG_FILE', '/victim-logs/auth.log')
+    if platform.system() == 'Linux' and os.path.exists(victim_log):
+        from .linux_collector import collect_and_save_linux
+        return collect_and_save_linux(label=label, minutes=minutes)
+    else:
+        from .collector import collect_and_save
+        real_label = label if label != 'auto' else 'normal'
+        return collect_and_save(label=real_label, minutes=minutes)
 
 
 # ── LogWindow ro'yxati ────────────────────────────────────────────────────
@@ -209,12 +223,11 @@ def predict(request):
 
 @api_view(['POST'])
 def collect_now(request):
-    """Hozirgi Windows loglarini bir marta o'qib saqlaydi."""
-    from .collector import collect_and_save
+    """Windows yoki Linux loglarini bir marta o'qib saqlaydi."""
     label = request.data.get('label', 'normal')
     if label not in ('normal', 'brute_force', 'port_scan', 'anomaly'):
         label = 'normal'
-    window, counts = collect_and_save(label=label)
+    window, counts = _smart_collect(label=label)
     return Response({
         'id':                window.pk,
         'timestamp':         window.timestamp,
@@ -501,4 +514,287 @@ def export_pdf_report(request):
 
     response = HttpResponse(buf.read(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="cyberguard_report_{datetime.now().strftime("%Y%m%d_%H%M")}.pdf"'
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# YANGI ENDPOINTLAR: 3 AI Model + Victim + Excel
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── Victim holati va loglari ───────────────────────────────────────────────
+
+@api_view(['GET'])
+def victim_status(request):
+    """Victim container holati."""
+    from .linux_collector import victim_status as _vs
+    return Response(_vs())
+
+
+@api_view(['GET'])
+def victim_logs(request):
+    """Victim auth.log dan oxirgi N ta qator."""
+    n = min(int(request.GET.get('n', 60)), 300)
+    from .linux_collector import read_recent_log_lines
+    lines = read_recent_log_lines(n)
+    return Response({'lines': lines, 'count': len(lines)})
+
+
+@api_view(['POST'])
+def auto_collect(request):
+    """
+    Attacker tomonidan chaqiriladi: victim loglarini o'qib auto-label bilan saqlaydi.
+    Agar model o'qitilgan bo'lsa, bashorat ham qo'shadi.
+    """
+    label = request.data.get('label', 'auto')
+    window, counts = _smart_collect(label=label, minutes=5)
+
+    prediction = None
+    try:
+        from .multi_trainer import predict_all, WINDOW_SIZE
+        recent = list(
+            LogWindow.objects.order_by('-timestamp')[:WINDOW_SIZE].values(
+                *['failed_logins', 'success_logins', 'new_processes',
+                  'policy_changes', 'service_events', 'tcp_connections', 'running_processes', 'label']
+            )
+        )
+        recent.reverse()
+        current_dict = {k: counts.get(k, 0) for k in
+                        ['failed_logins', 'success_logins', 'new_processes',
+                         'policy_changes', 'service_events', 'tcp_connections', 'running_processes']}
+        prediction = predict_all(current_dict, recent if len(recent) >= WINDOW_SIZE else None)
+    except Exception:
+        pass
+
+    return Response({
+        'id':                window.pk,
+        'label':             window.label,
+        'failed_logins':     counts['failed_logins'],
+        'success_logins':    counts['success_logins'],
+        'tcp_connections':   counts['tcp_connections'],
+        'running_processes': counts['running_processes'],
+        'prediction':        prediction,
+    })
+
+
+# ── 3 AI Model: o'qitish, holat, bashorat ─────────────────────────────────
+
+@api_view(['POST'])
+def train_all_models(request):
+    """3 ta modelni background threadda o'qitadi."""
+    session = TrainSession.objects.create(status='pending')
+
+    def _run():
+        from .multi_trainer import train_all
+        try:
+            train_all(session_id=session.pk)
+        except Exception as e:
+            logger.error("Multi-train thread xatosi: %s", e)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return Response({
+        'session_id': session.pk,
+        'status':     'started',
+        'message':    "3 ta model o'qitilmoqda. /api/lab/models/status/ dan kuzating.",
+    })
+
+
+@api_view(['GET'])
+def all_models_status(request):
+    """3 ta model holati va metrikalar."""
+    from .multi_trainer import models_status
+    session = TrainSession.objects.filter(status__in=['running', 'done', 'failed']).first()
+    return Response({
+        'models':         models_status(),
+        'train_status':   session.status    if session else 'no_session',
+        'last_trained_at': session.created_at if session else None,
+        'total_windows':  LogWindow.objects.count(),
+        'label_dist':     dict(LogWindow.objects.values_list('label').annotate(
+                              n=__import__('django.db.models', fromlist=['Count']).Count('id')
+                          ).values_list('label', 'n')),
+    })
+
+
+@api_view(['GET'])
+def predict_all_models(request):
+    """Oxirgi LogWindow asosida 3 ta model bilan bashorat."""
+    from .multi_trainer import predict_all, WINDOW_SIZE
+
+    recent = list(
+        LogWindow.objects.order_by('-timestamp')[:WINDOW_SIZE].values(
+            'failed_logins', 'success_logins', 'new_processes',
+            'policy_changes', 'service_events', 'tcp_connections', 'running_processes', 'label',
+        )
+    )
+    recent.reverse()
+
+    if not recent:
+        return Response({'error': "Ma'lumot yo'q. Avval log yig'ing."}, status=400)
+
+    current = recent[-1] if recent else {}
+    results = predict_all(current, recent if len(recent) >= WINDOW_SIZE else None)
+
+    # Bashorat logi (MLP model kabi)
+    from django.utils import timezone as dj_tz
+    rf_pred = results.get('rf', {})
+    if rf_pred and not rf_pred.get('error'):
+        probs = rf_pred.get('probabilities', {})
+        PredictionLog.objects.create(
+            timestamp        = dj_tz.now(),
+            prediction       = rf_pred.get('label', 'unknown'),
+            confidence       = rf_pred.get('confidence', 0),
+            prob_normal      = probs.get('normal', 0),
+            prob_brute_force = probs.get('brute_force', 0),
+            prob_port_scan   = probs.get('port_scan', 0),
+            prob_anomaly     = probs.get('anomaly', 0),
+            triggered_by     = 'multi_predict',
+        )
+
+    return Response({
+        'predictions':      results,
+        'current_window':   current,
+        'windows_available': len(recent),
+        'window_size_needed': WINDOW_SIZE,
+    })
+
+
+# ── Excel / CSV yuklash va batch bashorat ──────────────────────────────────
+
+EXCEL_FEATURE_KEYS = [
+    'failed_logins', 'success_logins', 'new_processes',
+    'policy_changes', 'service_events', 'tcp_connections', 'running_processes',
+]
+
+
+@api_view(['POST'])
+def upload_excel(request):
+    """
+    Excel (.xlsx) yoki CSV fayl yuklash → 3 model bilan har qator bashorat.
+    Natija: JSON (jadval) + yuklab olish imkoniyati.
+    """
+    try:
+        import pandas as pd
+    except ImportError:
+        return Response({'error': 'pandas o\'rnatilmagan.'}, status=500)
+
+    file = request.FILES.get('file')
+    if not file:
+        return Response({'error': 'Fayl yuklanmadi.'}, status=400)
+
+    try:
+        if file.name.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            df = pd.read_excel(file)
+    except Exception as e:
+        return Response({'error': f'Fayl o\'qishda xato: {e}'}, status=400)
+
+    # Ustun nomlarini normallashtirish
+    df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
+
+    missing = [k for k in EXCEL_FEATURE_KEYS if k not in df.columns]
+    if missing:
+        return Response({
+            'error': f"Ustunlar topilmadi: {missing}",
+            'hint':  f"Kerakli ustunlar: {EXCEL_FEATURE_KEYS}",
+            'found': list(df.columns),
+        }, status=400)
+
+    from .multi_trainer import predict_rf, predict_iso, _paths, WINDOW_SIZE
+    from pathlib import Path
+
+    rf_ready  = Path(_paths('rf')['model']).exists()
+    iso_ready = Path(_paths('iso')['model']).exists()
+
+    results = []
+    for idx, row in df.iterrows():
+        window_dict = {k: float(row.get(k, 0) or 0) for k in EXCEL_FEATURE_KEYS}
+        real_label  = str(row.get('label', '')).strip() or None
+
+        entry = {
+            'row':       idx + 1,
+            **window_dict,
+            'real_label': real_label,
+            'rf':         None,
+            'nn':         None,
+            'iso':        None,
+        }
+
+        if rf_ready:
+            try:
+                r = predict_rf(window_dict)
+                entry['rf'] = r.get('label')
+                entry['rf_confidence'] = round(r.get('confidence', 0) * 100, 1)
+            except Exception:
+                entry['rf'] = 'xato'
+
+        if iso_ready:
+            try:
+                r = predict_iso(window_dict)
+                entry['iso'] = r.get('label')
+                entry['iso_confidence'] = round(r.get('confidence', 0) * 100, 1)
+            except Exception:
+                entry['iso'] = 'xato'
+
+        entry['nn'] = 'ketma-ket oyna kerak'
+        results.append(entry)
+
+    # Xulosalar
+    total = len(results)
+    attack_rf  = sum(1 for r in results if r['rf']  not in (None, 'normal', 'xato', 'ketma-ket oyna kerak'))
+    attack_iso = sum(1 for r in results if r['iso'] not in (None, 'normal', 'xato', 'ketma-ket oyna kerak'))
+
+    # Accuracy (agar real label mavjud bo'lsa)
+    labeled = [r for r in results if r['real_label'] and r['real_label'] in ('normal', 'brute_force', 'port_scan', 'anomaly')]
+    rf_acc  = None
+    if labeled and rf_ready:
+        correct = sum(1 for r in labeled if r['rf'] == r['real_label'])
+        rf_acc  = round(correct / len(labeled) * 100, 1)
+
+    return Response({
+        'total_rows':    total,
+        'results':       results,
+        'summary': {
+            'rf_attacks_detected':  attack_rf,
+            'iso_attacks_detected': attack_iso,
+            'rf_accuracy_on_labeled': rf_acc,
+            'labeled_rows':           len(labeled),
+        },
+        'models_available': {'rf': rf_ready, 'iso': iso_ready, 'nn': False},
+    })
+
+
+@api_view(['GET'])
+def excel_template(request):
+    """Namuna Excel fayl yuklab olish."""
+    try:
+        import openpyxl
+    except ImportError:
+        return Response({'error': 'openpyxl o\'rnatilmagan.'}, status=500)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'LogWindows'
+
+    headers = EXCEL_FEATURE_KEYS + ['label']
+    ws.append(headers)
+
+    # Namuna qatorlar
+    samples = [
+        [0, 5, 3, 0, 1, 65, 230, 'normal'],
+        [45, 1, 2, 0, 1, 95, 228, 'brute_force'],
+        [1, 2, 4, 0, 2, 220, 235, 'port_scan'],
+        [3, 4, 18, 2, 5, 80, 265, 'anomaly'],
+    ]
+    for row in samples:
+        ws.append(row)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = 'attachment; filename="cyberguard_template.xlsx"'
     return response

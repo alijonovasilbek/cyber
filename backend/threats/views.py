@@ -520,8 +520,72 @@ def _get_local_agent_script_content(request, script_name: str) -> tuple[str | No
 @extend_schema(tags=['Dashboard'], responses=DashboardStatsSerializer)
 @api_view(['GET'])
 def dashboard_stats(request):
+    from lab.models import LogWindow, PredictionLog
+    from lab.multi_trainer import models_status
+    from django.utils import timezone as tz
+    from django.db.models import Count as DCount
+
     logs = ThreatLog.objects.all()
     stats = get_dashboard_stats(logs)
+
+    # Lab app ma'lumotlarini qo'shish
+    windows = LogWindow.objects.all()
+    total_windows = windows.count()
+    label_dist = dict(
+        windows.values('label').annotate(c=DCount('id')).values_list('label', 'c')
+    )
+    threat_labels = {'brute_force', 'port_scan', 'anomaly'}
+    threat_windows = sum(v for k, v in label_dist.items() if k in threat_labels)
+    normal_windows = label_dist.get('normal', 0)
+
+    # AI model metrikalari
+    try:
+        mstatus = models_status()
+        rf = mstatus.get('rf', {})
+        nn = mstatus.get('nn', {})
+        best_acc = max(
+            rf.get('accuracy') or 0,
+            nn.get('accuracy') or 0,
+        )
+        best_f1 = max(
+            rf.get('f1') or 0,
+            nn.get('f1') or 0,
+        )
+    except Exception:
+        best_acc, best_f1 = 0.0, 0.0
+
+    # Soatlik trend (LogWindow dan)
+    now = tz.now()
+    hourly_trend = []
+    for hours_ago in range(22, -2, -2):
+        slot_start = now - tz.timedelta(hours=hours_ago)
+        slot_end = slot_start + tz.timedelta(hours=2)
+        slot_w = windows.filter(timestamp__gte=slot_start, timestamp__lt=slot_end)
+        slot_threats = slot_w.exclude(label='normal').count()
+        hourly_trend.append({
+            'hour': slot_start.strftime('%H:%M'),
+            'threats': slot_threats,
+            'blocked': 0,
+        })
+
+    stats.update({
+        'total_threats': threat_windows or stats['total_threats'],
+        'blocked': stats['blocked'],
+        'critical': windows.filter(label='brute_force').count(),
+        'block_rate': round(threat_windows / total_windows * 100, 1) if total_windows else 0.0,
+        'threat_distribution': {
+            k: v for k, v in label_dist.items() if k != 'normal'
+        } or stats['threat_distribution'],
+        'accuracy': round(best_acc * 100, 1),
+        'f1_score': round(best_f1 * 100, 1),
+        'response_ms': 0,
+        'false_positive_rate': round(normal_windows / total_windows * 100, 1) if total_windows else 0.0,
+        'hourly_trend': hourly_trend if threat_windows > 0 else stats['hourly_trend'],
+        # Qo'shimcha lab statistikasi
+        'total_windows': total_windows,
+        'label_distribution': label_dist,
+        'models_trained': best_acc > 0,
+    })
     return Response(stats)
 
 
@@ -758,8 +822,55 @@ class ThreatLogViewSet(viewsets.ModelViewSet):
     queryset = ThreatLog.objects.all().order_by('-created_at')
     serializer_class = ThreatLogSerializer
 
+    def list(self, request, *args, **kwargs):
+        from lab.models import LogWindow
+        _SEV = {'brute_force': 'critical', 'port_scan': 'high', 'anomaly': 'high', 'normal': 'low'}
+        _ALG = {'brute_force': 'Random Forest + Neural Net', 'port_scan': 'Random Forest', 'anomaly': 'Isolation Forest', 'normal': 'Random Forest'}
+        _MSG = {
+            'brute_force': 'SSH Brute Force hujumi aniqlandi',
+            'port_scan':   'Port Scan hujumi aniqlandi',
+            'anomaly':     'Anomal faollik aniqlandi',
+            'normal':      'Normal trafik',
+        }
+        windows = LogWindow.objects.exclude(label='normal').order_by('-timestamp')[:200]
+        results = []
+        for w in windows:
+            results.append({
+                'id': w.id,
+                'ip_address': '172.19.0.4',
+                'threat_type': w.label,
+                'severity': _SEV.get(w.label, 'low'),
+                'probability': round(
+                    min(1.0, w.failed_logins / 50 if w.label == 'brute_force'
+                        else w.tcp_connections / 200 if w.label == 'port_scan'
+                        else 0.75),
+                    2,
+                ) if w.label != 'normal' else 0.1,
+                'description': _MSG.get(w.label, ''),
+                'is_blocked': False,
+                'device_name': 'Victim Server (172.19.0.4)',
+                'algorithm': _ALG.get(w.label, 'Random Forest'),
+                'created_at': w.timestamp.isoformat(),
+                'failed_logins': w.failed_logins,
+                'tcp_connections': w.tcp_connections,
+                'source': w.source,
+            })
+        return Response(results)
+
     @action(detail=True, methods=['post'])
     def block(self, request, pk=None):
+        from lab.models import LogWindow
+        try:
+            w = LogWindow.objects.get(pk=pk)
+            BlockedIP.objects.get_or_create(
+                ip_address='172.19.0.4',
+                defaults={'reason': f"Auto-blocked: {w.label} (victim log #{pk})"},
+            )
+            payload = {'status': 'blocked', 'ip': '172.19.0.4', 'threat_log_id': pk}
+            publish_event('response.blocked', payload)
+            return Response(payload)
+        except LogWindow.DoesNotExist:
+            pass
         log = self.get_object()
         log.is_blocked = True
         log.save(update_fields=['is_blocked'])

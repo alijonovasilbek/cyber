@@ -7,13 +7,43 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyberguard-change-me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cyberguard
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
+    networks:
+      - cyberguard
     restart: unless-stopped
+
+  # ── Victim: hujum qabul qiluvchi real Linux server ──────────────────────
+  victim:
+    build:
+      context: ./docker/victim
+    volumes:
+      - victim_logs:/victim-logs
+    networks:
+      - cyberguard
+    restart: unless-stopped
+    hostname: victim
+
+  # ── Attacker: victim ga avtomatik hujum qiladi ─────────────────────────
+  attacker:
+    build:
+      context: ./docker/attacker
+    networks:
+      - cyberguard
+    depends_on:
+      - victim
+      - backend
+    restart: unless-stopped
+    environment:
+      VICTIM_HOST: victim
+      BACKEND_API: http://backend:8000/api
+      API_KEY: ${CYBERGUARD_API_KEY:-cyberguard-demo-key}
 
   backend:
     build:
@@ -34,9 +64,15 @@ services:
       SECRET_KEY: ${SECRET_KEY:-django-insecure-change-me}
       CYBERGUARD_API_KEY: ${CYBERGUARD_API_KEY:-cyberguard-demo-key}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      VICTIM_LOG_FILE: /victim-logs/auth.log
+    volumes:
+      - victim_logs:/victim-logs:ro
+      - saved_models:/app/lab/saved_models
     depends_on:
       - postgres
       - redis
+    networks:
+      - cyberguard
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -48,6 +84,8 @@ services:
         VITE_API_ORIGIN: same-origin
     depends_on:
       - backend
+    networks:
+      - cyberguard
     ports:
       - "80:80"
     restart: unless-stopped
@@ -55,3 +93,9 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  victim_logs:
+  saved_models:
+
+networks:
+  cyberguard:
+    driver: bridge

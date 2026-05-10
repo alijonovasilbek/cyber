@@ -290,4 +290,30 @@ export const api = {
   labCollect:        label  => post('/lab/collect/', { label: label || 'normal' }),
   labHistory:        (n=50) => get(`/lab/history/?limit=${n}`),
   labScenario:       type   => post('/lab/scenario/', { type }),
+
+  // ── Victim monitoring ──────────────────────────────────────────────────
+  victimStatus:      ()     => get('/lab/victim/status/'),
+  victimLogs:        (n=60) => get(`/lab/victim/logs/?n=${n}`),
+  autoCollect:       label  => post('/lab/auto-collect/', { label: label || 'auto' }),
+
+  // ── 3 AI Model ──────────────────────────────────────────────────────────
+  trainAllModels:    ()     => post('/lab/models/train-all/', {}),
+  allModelsStatus:   ()     => get('/lab/models/status/'),
+  predictAllModels:  ()     => get('/lab/models/predict-all/'),
+
+  // ── Excel tahlil ──────────────────────────────────────────────────────
+  uploadExcel: (formData) => {
+    const response = fetch(`${BASE}/lab/upload-excel/`, {
+      method: 'POST',
+      headers: { 'X-API-Key': getApiKey() },
+      body: formData,
+    });
+    return response.then(async r => {
+      const text = await r.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+      return data;
+    });
+  },
+  excelTemplateUrl: () => `${BASE}/lab/excel-template/`,
 };

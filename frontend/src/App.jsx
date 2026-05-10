@@ -631,22 +631,23 @@ function Sidebar({ page, setPage, alertCount, mobileOpen, onClose, themeMode, on
       ],
     },
     {
-      title: 'MODULLAR',
+      title: 'MONITORING',
       items: [
-        { id: 'topology', label: 'Tarmoq xaritasi', ico: 'TP' },
-        { id: 'logs', label: 'Live Loglar', ico: 'LG' },
-        { id: 'threats', label: 'Tahdid Loglari', ico: 'TL', badge: alertCount },
+        { id: 'live_monitor', label: 'Live Monitoring', ico: 'LM' },
+        { id: 'logs',         label: 'Live Loglar',     ico: 'LG' },
+        { id: 'threats',      label: 'Tahdid Loglari',  ico: 'TL', badge: alertCount },
+        // { id: 'topology',     label: 'Tarmoq Xaritasi', ico: 'TP' },
       ],
     },
     {
-      title: 'AI KENGAYTIRILGAN',
+      title: 'AI TAHLIL',
       items: [
-        { id: 'prediction', label: 'AI Bashorat', ico: 'AI' },
-        // { id: 'ml_lab', label: 'ML Laboratoriya', ico: 'ML' },
-        // { id: 'ai_lab', label: 'AI Laboratoriya', ico: 'AI' },
-        { id: 'visualization', label: 'Vizualizatsiya', ico: 'VZ' },
-        { id: 'mitre', label: 'MITRE ATT&CK', ico: 'MT' },
-        { id: 'reports', label: 'Hisobotlar', ico: 'HR' },
+        { id: 'ai_models',      label: 'AI Modellar',    ico: 'AI' },
+        { id: 'excel_analysis', label: 'Excel Tahlil',   ico: 'XL' },
+        { id: 'prediction',     label: 'AI Bashorat',    ico: 'PR' },
+        // { id: 'visualization',  label: 'Vizualizatsiya', ico: 'VZ' },
+        // { id: 'mitre',          label: 'MITRE ATT&CK',   ico: 'MT' },
+        { id: 'reports',        label: 'Hisobotlar',     ico: 'HR' },
       ],
     },
   ];
@@ -705,11 +706,14 @@ function Sidebar({ page, setPage, alertCount, mobileOpen, onClose, themeMode, on
 // ── TOPBAR ─────────────────────────────────────────────────────────────────
 function TopBar({ page, time, onMenuToggle, themeMode, onToggleTheme }) {
   const titles = {
-    dashboard: 'THREAT DASHBOARD',
-    threats: 'TAHDID LOGLARI',
-    network: 'LOCAL NETWORK SCANNER',
-    analyze: 'IP ANALYSIS ENGINE',
-    logs: 'LIVE LOG STREAM',
+    dashboard:      'THREAT DASHBOARD',
+    threats:        'TAHDID LOGLARI',
+    network:        'LOCAL NETWORK SCANNER',
+    analyze:        'IP ANALYSIS ENGINE',
+    logs:           'LIVE LOG STREAM',
+    live_monitor:   'LIVE MONITORING — VICTIM SERVER',
+    ai_models:      '3 AI MODEL — O\'QITISH VA TAQQOSLASH',
+    excel_analysis: 'EXCEL TAHLIL — BATCH BASHORAT',
     threat_library: 'THREAT KNOWLEDGE BASE',
     algorithms: 'ALGORITHM CATALOG',
     datasets: 'DATASET REFERENCE',
@@ -5841,7 +5845,8 @@ function ReportsPage() {
     try {
       const d = await api.runCorrelation();
       const n = (d.new_incidents || []).length;
-      setCorrMsg(n > 0 ? `${n} ta yangi intsident aniqlandi!` : "Yangi intsidentlar topilmadi (yetarli tahdid log yo'q)");
+      const total = (d.all_incidents || []).length;
+      setCorrMsg(n > 0 ? `${n} ta yangi intsident aniqlandi!` : `Barcha intsidentlar allaqachon qayd etilgan (jami: ${total} ta)`);
       setIncidents(d.all_incidents || []);
     } catch (e) { setCorrMsg('Xato: ' + e.message); }
     setCorrelating(false);
@@ -5851,23 +5856,6 @@ function ReportsPage() {
 
   return (
     <div style={{ animation: 'fadeUp .3s ease' }}>
-      {/* ── DATABASE MIGRATION TRIGGER ── */}
-      <div style={{ marginBottom: 14, padding: '10px 16px', background: 'rgba(255,171,0,.06)', border: '1px solid rgba(255,171,0,.3)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: '#ffab00' }}>⚠ JADVAL XATOSI BO'LSA:</span>
-        <button
-          className="action-btn"
-          style={{ padding: '6px 16px', fontSize: 11, borderColor: '#ffab0066', color: '#ffab00' }}
-          onClick={runMigrate}
-          disabled={migrateLoading}
-        >
-          {migrateLoading ? 'QABUL QILINMOQDA...' : 'DB MIGRATIONLARNI QABUL QILISH'}
-        </button>
-        {migrateMsg && (
-          <span style={{ fontFamily: 'Share Tech Mono', fontSize: 11, color: migrateMsg.startsWith('✓') ? '#39ff14' : '#ff4444', flex: 1 }}>
-            {migrateMsg}
-          </span>
-        )}
-      </div>
 
       {/* Export cards */}
       <Panel title="MA'LUMOTLARNI EKSPORT QILISH" color={accent} style={{ marginBottom: 14 }}>
@@ -7111,6 +7099,596 @@ function PredictionPage() {
   );
 }
 
+// ── LIVE MONITORING PAGE ───────────────────────────────────────────────────
+function LiveMonitorPage() {
+  const [victimStatus, setVictimStatus] = useState(null);
+  const [logLines, setLogLines]         = useState([]);
+  const [windows, setWindows]           = useState([]);
+  const [collecting, setCollecting]     = useState(false);
+  const logRef = useRef(null);
+  const cyan   = themeAccent('cyan', '#00e5ff');
+
+  const LABEL_COLOR = { normal:'#39ff14', brute_force:'#ff4444', port_scan:'#ffab00', anomaly:'#a855f7' };
+  const LABEL_UZ    = { normal:'Normal', brute_force:'Brute Force', port_scan:'Port Scan', anomaly:'Anomaliya' };
+
+  const load = useCallback(async () => {
+    try {
+      const [sv, lv, wv] = await Promise.all([
+        api.victimStatus(),
+        api.victimLogs(80),
+        api.labWindows(15),
+      ]);
+      setVictimStatus(sv);
+      setLogLines(lv.lines || []);
+      setWindows(wv.results || []);
+    } catch { }
+  }, []);
+
+  useEffect(() => { load(); const id = setInterval(load, 5000); return () => clearInterval(id); }, [load]);
+  useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [logLines]);
+
+  const manualCollect = async () => {
+    setCollecting(true);
+    try { await api.autoCollect('auto'); await load(); } catch { }
+    setCollecting(false);
+  };
+
+  const isOnline = victimStatus?.online;
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      {/* Victim holati */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12, marginBottom:14 }}>
+        {[
+          { label:'VICTIM STATUS', val: isOnline ? 'ONLINE' : 'OFFLINE', c: isOnline ? '#39ff14' : '#ff4444' },
+          { label:'LOG FAYL',      val: victimStatus?.log_exists ? 'TOPILDI' : 'YO\'Q', c: victimStatus?.log_exists ? '#39ff14' : '#ff4444' },
+          { label:'JAMI QATORLAR', val: victimStatus?.total_lines ?? '—', c: cyan },
+          { label:'SO\'NGI FAILED LOGINS', val: victimStatus?.recent_failed ?? '—', c: '#ff4444' },
+        ].map(({ label, val, c }) => (
+          <div key={label} style={{ padding:'14px 16px', border:`1px solid ${c}33`, background:`${c}08` }}>
+            <div style={{ fontSize:10, color:'#4a6a84', letterSpacing:1, marginBottom:6 }}>{label}</div>
+            <div style={{ fontSize:22, color:c, fontFamily:'Share Tech Mono', fontWeight:700 }}>{String(val)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 340px', gap:14 }}>
+        {/* Auth.log stream */}
+        <Panel title="VICTIM AUTH.LOG (LIVE)" color='#ff4444'>
+          <div style={{ padding:'10px 14px 6px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontFamily:'Share Tech Mono', fontSize:10, color:'#4a6a84' }}>
+              {victimStatus?.log_file || '/victim-logs/auth.log'}
+            </span>
+            <button
+              onClick={manualCollect} disabled={collecting}
+              style={{ padding:'5px 12px', border:`1px solid ${cyan}66`, background:'transparent',
+                color:cyan, fontFamily:'Share Tech Mono', fontSize:10, cursor:'pointer' }}
+            >
+              {collecting ? '...' : 'LOG YIG\'ISH'}
+            </button>
+          </div>
+          <div ref={logRef} style={{
+            height:420, overflowY:'auto', fontFamily:'Share Tech Mono', fontSize:11,
+            padding:'8px 14px', background:'rgba(0,0,0,0.3)',
+          }}>
+            {logLines.length === 0
+              ? <div style={{ color:'#4a6a84', padding:20, textAlign:'center' }}>
+                  {isOnline === false ? 'Victim offline — docker-compose up ni ishga tushiring' : 'Log qatorlari yo\'q...'}
+                </div>
+              : logLines.map((line, i) => {
+                  const isFailed  = line.includes('Failed password');
+                  const isSuccess = line.includes('Accepted password');
+                  const c = isFailed ? '#ff6b6b' : isSuccess ? '#39ff14' : '#4a6a84';
+                  return (
+                    <div key={i} style={{ color:c, lineHeight:1.7, borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
+                      {isFailed && <span style={{ color:'#ff4444', marginRight:6 }}>FAIL</span>}
+                      {isSuccess && <span style={{ color:'#39ff14', marginRight:6 }}>OK</span>}
+                      {line}
+                    </div>
+                  );
+                })}
+          </div>
+        </Panel>
+
+        {/* So'nggi LogWindowlar */}
+        <Panel title="SO'NGI LOG OYNALARI" color={cyan}>
+          <div style={{ padding:'6px 0' }}>
+            {windows.length === 0
+              ? <div style={{ color:'#4a6a84', padding:20, textAlign:'center', fontSize:12 }}>Ma'lumot yo'q</div>
+              : windows.slice().reverse().map(w => {
+                  const lc = LABEL_COLOR[w.label] || '#4a6a84';
+                  return (
+                    <div key={w.id} style={{
+                      padding:'10px 14px', borderBottom:'1px solid var(--border2)',
+                      display:'flex', justifyContent:'space-between', alignItems:'center',
+                    }}>
+                      <div>
+                        <div style={{ fontFamily:'Share Tech Mono', fontSize:10, color:'#4a6a84' }}>
+                          {w.timestamp ? new Date(w.timestamp).toLocaleTimeString() : ''}
+                        </div>
+                        <div style={{ fontSize:12, color:'#7ab8d4', marginTop:3 }}>
+                          Failed: <b style={{ color:'#ff6b6b' }}>{w.failed_logins}</b>&nbsp;
+                          TCP: <b style={{ color:cyan }}>{w.tcp_connections}</b>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontFamily:'Share Tech Mono', fontSize:10, color:lc,
+                        padding:'3px 8px', border:`1px solid ${lc}44`, background:`${lc}11`,
+                      }}>
+                        {LABEL_UZ[w.label] || w.label}
+                      </span>
+                    </div>
+                  );
+                })}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+
+// ── AI MODELS PAGE ─────────────────────────────────────────────────────────
+function AIModelsPage() {
+  const [status, setStatus]       = useState(null);
+  const [training, setTraining]   = useState(false);
+  const [trainMsg, setTrainMsg]   = useState('');
+  const [prediction, setPrediction] = useState(null);
+  const [predLoading, setPredLoading] = useState(false);
+  const [genLoading, setGenLoading]   = useState(false);
+  const [genMsg, setGenMsg]           = useState('');
+  const [selectedModel, setSelectedModel] = useState('rf');
+  const cyan = themeAccent('cyan', '#00e5ff');
+
+  const MODEL_INFO = {
+    rf:  { name:'Random Forest',        color:'#00e5ff', sub:'Ensemble / Supervised',   icon:'RF' },
+    nn:  { name:'Neural Network',       color:'#a855f7', sub:'Sequential MLP / Supervised', icon:'NN' },
+    iso: { name:'Isolation Forest',     color:'#39ff14', sub:'Anomaly / Unsupervised',  icon:'IF' },
+  };
+  const LABEL_COLOR = { normal:'#39ff14', brute_force:'#ff4444', port_scan:'#ffab00', anomaly:'#a855f7' };
+
+  const loadStatus = useCallback(async () => {
+    try { setStatus(await api.allModelsStatus()); } catch { }
+  }, []);
+
+  useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  useEffect(() => {
+    if (training) {
+      const id = setInterval(async () => {
+        const s = await api.labTrainStatus().catch(() => ({}));
+        if (s.status === 'done' || s.status === 'failed') {
+          setTraining(false);
+          setTrainMsg(s.status === 'done' ? '✓ Barcha modellar o\'qitildi!' : '⚠ Xato: ' + (s.error || ''));
+          loadStatus();
+          clearInterval(id);
+        }
+      }, 2000);
+      return () => clearInterval(id);
+    }
+  }, [training, loadStatus]);
+
+  const startTrain = async () => {
+    setTraining(true); setTrainMsg('');
+    try {
+      const total = status?.total_windows || 0;
+      if (total < 30) {
+        setGenLoading(true);
+        await api.labGenDataset({ n_normal:300, n_brute_force:200, n_port_scan:200, n_anomaly:150 });
+        setGenLoading(false);
+        setGenMsg('Dataset yaratildi.');
+      }
+      await api.trainAllModels();
+      setTrainMsg("O'qitilmoqda...");
+    } catch (e) {
+      setTraining(false);
+      setTrainMsg('Xato: ' + e.message);
+    }
+  };
+
+  const runPredict = async () => {
+    setPredLoading(true);
+    try { setPrediction(await api.predictAllModels()); } catch (e) { setPrediction({ error: e.message }); }
+    setPredLoading(false);
+  };
+
+  const models = status?.models || {};
+  const anyTrained = Object.values(models).some(m => m.trained);
+
+  const ConfMatrix = ({ cm, classes }) => {
+    if (!cm || !classes) return null;
+    return (
+      <div style={{ overflowX:'auto', marginTop:8 }}>
+        <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'Share Tech Mono' }}>
+          <thead>
+            <tr>
+              <th style={{ padding:'4px 8px', color:'#4a6a84' }}></th>
+              {classes.map(c => <th key={c} style={{ padding:'4px 8px', color:cyan, textTransform:'uppercase' }}>{c.slice(0,6)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {cm.map((row, i) => (
+              <tr key={i}>
+                <td style={{ padding:'4px 8px', color:'#4a6a84', whiteSpace:'nowrap' }}>{classes[i]?.slice(0,8)}</td>
+                {row.map((v, j) => (
+                  <td key={j} style={{
+                    padding:'4px 10px', textAlign:'center',
+                    background: i === j ? `${cyan}22` : 'transparent',
+                    color: i === j ? cyan : '#7ab8d4',
+                    border:'1px solid var(--border2)',
+                  }}>{v}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      {/* Boshqaruv paneli */}
+      <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:14, flexWrap:'wrap' }}>
+        <button
+          onClick={startTrain} disabled={training}
+          style={{
+            padding:'10px 24px', border:`1px solid ${cyan}`, background:`${cyan}11`,
+            color:cyan, fontFamily:'Share Tech Mono', fontSize:12, cursor:training?'wait':'pointer',
+          }}
+        >
+          {training ? (genLoading ? '⟳ DATASET YARATILMOQDA...' : '⟳ O\'QITILMOQDA...') : '3 AI MODEL O\'QITISH'}
+        </button>
+        <button
+          onClick={runPredict} disabled={predLoading || !anyTrained}
+          style={{
+            padding:'10px 24px', border:'1px solid #a855f744', background:'#a855f711',
+            color:'#a855f7', fontFamily:'Share Tech Mono', fontSize:12, cursor:'pointer',
+          }}
+        >
+          {predLoading ? '⟳ ...' : 'HOZIR BASHORAT QILISH'}
+        </button>
+        {trainMsg && <span style={{ fontFamily:'Share Tech Mono', fontSize:11,
+          color: trainMsg.startsWith('✓') ? '#39ff14' : '#ffab00' }}>{trainMsg}</span>}
+        {genMsg && <span style={{ fontFamily:'Share Tech Mono', fontSize:10, color:'#4a6a84' }}>{genMsg}</span>}
+        <span style={{ marginLeft:'auto', fontSize:11, color:'#4a6a84', fontFamily:'Share Tech Mono' }}>
+          Jami oynalar: {status?.total_windows ?? '...'}
+        </span>
+      </div>
+
+      {/* 3 model taqqoslash */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:14 }}>
+        {Object.entries(MODEL_INFO).map(([key, info]) => {
+          const m = models[key] || {};
+          const pred = prediction?.predictions?.[key];
+          return (
+            <div key={key}
+              onClick={() => setSelectedModel(key)}
+              style={{
+                border:`2px solid ${selectedModel === key ? info.color : info.color + '44'}`,
+                background: selectedModel === key ? `${info.color}08` : 'transparent',
+                padding:16, cursor:'pointer', transition:'all .2s',
+              }}
+            >
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:10 }}>
+                <div style={{ fontFamily:'Share Tech Mono', fontSize:13, color:info.color, fontWeight:700 }}>
+                  {info.name}
+                </div>
+                <span style={{
+                  fontFamily:'Share Tech Mono', fontSize:10,
+                  color: m.trained ? '#39ff14' : '#4a6a84',
+                  padding:'2px 8px', border:`1px solid ${m.trained ? '#39ff1444' : '#4a6a8444'}`,
+                }}>
+                  {m.trained ? 'O\'QITILGAN' : 'KUTILMOQDA'}
+                </span>
+              </div>
+              <div style={{ fontSize:10, color:'#4a6a84', marginBottom:12 }}>{info.sub}</div>
+
+              {m.trained && (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+                  {[['Accuracy', m.accuracy], ['F1 Score', m.f1],
+                    ['Precision', m.precision], ['Recall', m.recall]].map(([lbl, val]) => (
+                    <div key={lbl} style={{ padding:'6px 8px', background:'rgba(0,0,0,0.2)' }}>
+                      <div style={{ fontSize:9, color:'#4a6a84' }}>{lbl}</div>
+                      <div style={{ fontSize:14, color:info.color, fontFamily:'Share Tech Mono' }}>
+                        {val != null ? `${(val * 100).toFixed(1)}%` : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {pred && !pred.error && (
+                <div style={{
+                  padding:'8px 10px', background: `${LABEL_COLOR[pred.label] || '#4a6a84'}11`,
+                  border:`1px solid ${LABEL_COLOR[pred.label] || '#4a6a84'}44`, marginTop:8,
+                }}>
+                  <div style={{ fontSize:9, color:'#4a6a84' }}>JORIY BASHORAT</div>
+                  <div style={{ fontSize:13, color: LABEL_COLOR[pred.label] || '#7ab8d4',
+                    fontFamily:'Share Tech Mono', fontWeight:700 }}>
+                    {pred.label?.toUpperCase().replace('_',' ')}
+                  </div>
+                  <div style={{ fontSize:10, color:'#4a6a84' }}>
+                    Ishonch: {Math.round((pred.confidence || 0) * 100)}%
+                  </div>
+                </div>
+              )}
+              {pred?.error && (
+                <div style={{ fontSize:10, color:'#ffab00', marginTop:8 }}>{pred.error}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tanlangan model detali */}
+      {(() => {
+        const m = models[selectedModel] || {};
+        const info = MODEL_INFO[selectedModel];
+        if (!m.trained) return null;
+        return (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            {/* Confusion Matrix */}
+            <Panel title={`${info.name.toUpperCase()} — CONFUSION MATRIX`} color={info.color}>
+              <div style={{ padding:'10px 14px' }}>
+                <ConfMatrix cm={m.confusion_matrix} classes={m.classes} />
+              </div>
+            </Panel>
+
+            {/* Har sinf metrikalar + Feature importance */}
+            <Panel title={`${info.name.toUpperCase()} — SINF METRIKALAR`} color={info.color}>
+              <div style={{ padding:'10px 14px' }}>
+                {m.per_class && !m.per_class._multi && (
+                  <table className="alerts-table" style={{ marginBottom:12 }}>
+                    <thead><tr>
+                      <th>Sinf</th><th>Precision</th><th>Recall</th><th>F1</th>
+                    </tr></thead>
+                    <tbody>
+                      {Object.entries(m.per_class).map(([cls, vals]) => (
+                        <tr key={cls}>
+                          <td><span style={{ color: LABEL_COLOR[cls] || '#7ab8d4', fontFamily:'Share Tech Mono', fontSize:11 }}>{cls}</span></td>
+                          <td style={{ fontFamily:'Share Tech Mono', fontSize:11 }}>{((vals.precision||0)*100).toFixed(1)}%</td>
+                          <td style={{ fontFamily:'Share Tech Mono', fontSize:11 }}>{((vals.recall||0)*100).toFixed(1)}%</td>
+                          <td style={{ fontFamily:'Share Tech Mono', fontSize:11 }}>{((vals.f1||0)*100).toFixed(1)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {m.feature_importance && (
+                  <>
+                    <div style={{ fontSize:10, color:'#4a6a84', marginBottom:8 }}>FEATURE MUHIMLIGI</div>
+                    {Object.entries(m.feature_importance).map(([feat, pct]) => (
+                      <div key={feat} style={{ marginBottom:6 }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:3 }}>
+                          <span style={{ color:'#7ab8d4' }}>{feat}</span>
+                          <span style={{ color:info.color, fontFamily:'Share Tech Mono' }}>{pct.toFixed(1)}%</span>
+                        </div>
+                        <div style={{ height:4, background:'rgba(0,0,0,0.3)', borderRadius:2 }}>
+                          <div style={{ height:'100%', width:`${pct}%`, background:info.color, borderRadius:2 }}/>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </Panel>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+
+// ── EXCEL ANALYSIS PAGE ────────────────────────────────────────────────────
+function ExcelAnalysisPage() {
+  const [file, setFile]         = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [result, setResult]     = useState(null);
+  const [error, setError]       = useState('');
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+  const cyan = themeAccent('cyan', '#00e5ff');
+
+  const LABEL_COLOR = { normal:'#39ff14', brute_force:'#ff4444', port_scan:'#ffab00', anomaly:'#a855f7' };
+
+  const handleFile = (f) => {
+    if (!f) return;
+    if (!f.name.match(/\.(xlsx|xls|csv)$/i)) { setError('Faqat .xlsx, .xls yoki .csv fayl yuklang'); return; }
+    setFile(f); setError(''); setResult(null);
+  };
+
+  const upload = async () => {
+    if (!file) { setError('Fayl tanlang'); return; }
+    setLoading(true); setError(''); setResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const d = await api.uploadExcel(fd);
+      setResult(d);
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+
+  const downloadCSV = () => {
+    if (!result?.results) return;
+    const headers = ['row','failed_logins','success_logins','new_processes',
+      'policy_changes','service_events','tcp_connections','running_processes',
+      'real_label','rf','rf_confidence','iso','iso_confidence'];
+    const rows = result.results.map(r =>
+      headers.map(h => r[h] ?? '').join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' }));
+    a.download = 'cyberguard_predictions.csv';
+    a.click();
+  };
+
+  const FEATURES = ['failed_logins','success_logins','new_processes',
+    'policy_changes','service_events','tcp_connections','running_processes'];
+
+  return (
+    <div style={{ animation:'fadeUp .3s ease' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'340px 1fr', gap:14, alignItems:'start' }}>
+        {/* Yuklash paneli */}
+        <div>
+          <Panel title="EXCEL / CSV YUKLASH" color={cyan}>
+            <div style={{ padding:'14px 16px' }}>
+              {/* Drag & Drop zona */}
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border:`2px dashed ${dragOver ? cyan : '#4a6a84'}`,
+                  background: dragOver ? `${cyan}08` : 'rgba(0,0,0,0.15)',
+                  padding:28, textAlign:'center', cursor:'pointer',
+                  marginBottom:12, transition:'all .2s',
+                }}
+              >
+                <div style={{ fontSize:28, marginBottom:8 }}>📂</div>
+                <div style={{ fontSize:12, color:dragOver ? cyan : '#4a6a84' }}>
+                  {file ? file.name : 'Fayl tortib tashlang yoki bosing'}
+                </div>
+                {file && <div style={{ fontSize:10, color:'#39ff14', marginTop:4 }}>✓ {file.name}</div>}
+              </div>
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv"
+                onChange={e => handleFile(e.target.files[0])} style={{ display:'none' }}/>
+
+              <button onClick={upload} disabled={loading || !file} style={{
+                width:'100%', padding:'10px', border:`1px solid ${cyan}`,
+                background:`${cyan}11`, color:cyan, fontFamily:'Share Tech Mono',
+                fontSize:12, cursor: loading || !file ? 'not-allowed' : 'pointer',
+              }}>
+                {loading ? '⟳ TAHLIL QILINMOQDA...' : 'YUKLASH VA TAHLIL'}
+              </button>
+
+              {error && <div style={{ color:'#ff4444', fontSize:11, marginTop:8, fontFamily:'Share Tech Mono' }}>{error}</div>}
+
+              <div style={{ marginTop:16, paddingTop:12, borderTop:'1px solid var(--border2)' }}>
+                <div style={{ fontSize:10, color:'#4a6a84', marginBottom:8 }}>KERAKLI USTUNLAR:</div>
+                {FEATURES.map(f => (
+                  <div key={f} style={{ fontSize:10, color:'#7ab8d4', fontFamily:'Share Tech Mono',
+                    padding:'3px 0', borderBottom:'1px solid var(--border2)' }}>{f}</div>
+                ))}
+                <div style={{ fontSize:10, color:'#4a6a84', marginTop:6 }}>+ label (ixtiyoriy)</div>
+                <a href={api.excelTemplateUrl()} download style={{
+                  display:'block', marginTop:10, padding:'7px 12px', textAlign:'center',
+                  border:'1px solid #39ff1444', color:'#39ff14', fontSize:10,
+                  fontFamily:'Share Tech Mono', textDecoration:'none', background:'#39ff1408',
+                }}>
+                  NAMUNA FAYL YUKLAB OLISH
+                </a>
+              </div>
+            </div>
+          </Panel>
+
+          {/* Xulosa */}
+          {result?.summary && (
+            <Panel title="XULOSA" color='#39ff14' style={{ marginTop:12 }}>
+              <div style={{ padding:'12px 16px' }}>
+                {[
+                  ['Jami qatorlar', result.total_rows],
+                  ['RF hujumlar', result.summary.rf_attacks_detected],
+                  ['ISO anomaliyalar', result.summary.iso_attacks_detected],
+                  ['Belgilangan qatorlar', result.summary.labeled_rows],
+                  ['RF aniqlik (belgilangan)', result.summary.rf_accuracy_on_labeled != null
+                    ? result.summary.rf_accuracy_on_labeled + '%' : '—'],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ display:'flex', justifyContent:'space-between',
+                    padding:'7px 0', borderBottom:'1px solid var(--border2)', fontSize:12 }}>
+                    <span style={{ color:'#4a6a84' }}>{l}</span>
+                    <span style={{ fontFamily:'Share Tech Mono', color:'#7ab8d4' }}>{v ?? '—'}</span>
+                  </div>
+                ))}
+                <button onClick={downloadCSV} style={{
+                  marginTop:10, width:'100%', padding:'8px',
+                  border:'1px solid #39ff1444', background:'#39ff1408',
+                  color:'#39ff14', fontFamily:'Share Tech Mono', fontSize:11, cursor:'pointer',
+                }}>
+                  NATIJALARNI CSV YUKLAB OLISH
+                </button>
+              </div>
+            </Panel>
+          )}
+        </div>
+
+        {/* Natijalar jadvali */}
+        <Panel title={`BASHORAT NATIJALARI${result ? ` (${result.total_rows} qator)` : ''}`} color={cyan}>
+          {!result && (
+            <div style={{ padding:40, textAlign:'center', color:'#4a6a84', fontSize:13 }}>
+              Excel yoki CSV fayl yuklang — har qator uchun 3 model bashorat qiladi
+            </div>
+          )}
+          {result?.error && (
+            <div style={{ padding:20, color:'#ff4444', fontFamily:'Share Tech Mono', fontSize:12 }}>
+              Xato: {result.error}
+            </div>
+          )}
+          {result?.results && (
+            <div style={{ overflowX:'auto' }}>
+              <table className="alerts-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Failed</th><th>Success</th><th>Processes</th><th>TCP</th>
+                    <th>Haqiqiy</th>
+                    <th>Random Forest</th>
+                    <th>Neural Net</th>
+                    <th>Isolation Forest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.results.map(r => {
+                    const rfC  = LABEL_COLOR[r.rf]  || '#7ab8d4';
+                    const isoC = LABEL_COLOR[r.iso] || '#7ab8d4';
+                    const rlC  = LABEL_COLOR[r.real_label] || '#4a6a84';
+                    return (
+                      <tr key={r.row}>
+                        <td style={{ fontFamily:'Share Tech Mono', fontSize:10, color:'#4a6a84' }}>{r.row}</td>
+                        <td style={{ fontFamily:'Share Tech Mono', color:'#ff6b6b' }}>{r.failed_logins}</td>
+                        <td style={{ fontFamily:'Share Tech Mono', color:'#39ff14' }}>{r.success_logins}</td>
+                        <td style={{ fontFamily:'Share Tech Mono', color:'#7ab8d4' }}>{r.new_processes}</td>
+                        <td style={{ fontFamily:'Share Tech Mono', color:cyan }}>{r.tcp_connections}</td>
+                        <td>
+                          {r.real_label
+                            ? <span style={{ color:rlC, fontFamily:'Share Tech Mono', fontSize:10 }}>{r.real_label}</span>
+                            : <span style={{ color:'#4a6a84', fontSize:10 }}>—</span>}
+                        </td>
+                        <td>
+                          <span style={{ color:rfC, fontFamily:'Share Tech Mono', fontSize:10 }}>
+                            {r.rf || '—'}
+                            {r.rf_confidence != null && <small style={{ color:'#4a6a84' }}> {r.rf_confidence}%</small>}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ color:'#4a6a84', fontSize:10, fontStyle:'italic' }}>
+                            {r.nn || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ color:isoC, fontFamily:'Share Tech Mono', fontSize:10 }}>
+                            {r.iso || '—'}
+                            {r.iso_confidence != null && <small style={{ color:'#4a6a84' }}> {r.iso_confidence}%</small>}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+
 // ── ROOT APP ───────────────────────────────────────────────────────────────
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(() => safeStorageGet('cg_auth', '') === '1');
@@ -7185,24 +7763,24 @@ export default function App() {
       <div className="main">
         <TopBar page={page} time={time} onMenuToggle={() => setMobileNavOpen(open => !open)} themeMode={themeMode} onToggleTheme={toggleTheme}/>
         <div className="content">
-          {page === 'dashboard' && <DashboardPage/>}
-          {page === 'threats'   && <ThreatsPage/>}
-          {/* page === 'network'   && <NetworkPage onAnalyze={handleNetworkAnalyze}/> */}
-          {/* page === 'analyze'   && <AnalyzePage initialIP={analyzeIP} initialContext={analyzeContext} initialThreat={analyzeThreat}/> */}
+          {page === 'dashboard'      && <DashboardPage/>}
+          {page === 'threats'        && <ThreatsPage/>}
           {page === 'threat_library' && <InsightsPage initialTab="threats"/>}
-          {page === 'algorithms' && <InsightsPage initialTab="algorithms"/>}
-          {page === 'datasets' && <InsightsPage initialTab="datasets"/>}
-          {page === 'siem' && <SIEMPage/>}
-          {page === 'topology' && <TopologyPage/>}
-          {page === 'logs'      && <LogsPage/>}
-          {page === 'insights'  && <InsightsPage initialTab="threats"/>}
-          {page === 'settings'  && <SettingsPage/>}
-          {/* page === 'ml_lab'    && <MLLabPage/> */}
-          {/* page === 'ai_lab'    && <AILabPage/> */}
-          {page === 'prediction'   && <PredictionPage/>}
-          {page === 'visualization' && <VisualizationPage/>}
-          {page === 'mitre'     && <MitrePage/>}
-          {page === 'reports'   && <ReportsPage/>}
+          {page === 'algorithms'     && <InsightsPage initialTab="algorithms"/>}
+          {page === 'datasets'       && <InsightsPage initialTab="datasets"/>}
+          {page === 'siem'           && <SIEMPage/>}
+          {/* page === 'topology'       && <TopologyPage/> */}
+          {page === 'logs'           && <LogsPage/>}
+          {page === 'insights'       && <InsightsPage initialTab="threats"/>}
+          {page === 'settings'       && <SettingsPage/>}
+          {page === 'prediction'     && <PredictionPage/>}
+          {/* page === 'visualization'  && <VisualizationPage/> */}
+          {/* page === 'mitre'          && <MitrePage/> */}
+          {page === 'reports'        && <ReportsPage/>}
+          {/* Yangi sahifalar */}
+          {page === 'live_monitor'   && <LiveMonitorPage/>}
+          {page === 'ai_models'      && <AIModelsPage/>}
+          {page === 'excel_analysis' && <ExcelAnalysisPage/>}
         </div>
         <div className="ticker-wrap">
           <div className="ticker-inner">

@@ -1037,19 +1037,29 @@ def _get_recommendation(severity: str, is_local: bool, telemetry: dict) -> str:
     return prefix + 'hozircha oddiy monitoring yetarli.'
 
 
-def build_live_logs(limit: int = 10) -> list:
-    from .models import ThreatLog
+def build_live_logs(limit: int = 50) -> list:
+    from lab.models import LogWindow
 
-    recent_logs = list(ThreatLog.objects.order_by('-created_at')[:limit])
+    _LEVEL = {'brute_force': 'error', 'port_scan': 'warn', 'anomaly': 'warn', 'normal': 'info'}
+    _MSG = {
+        'brute_force': 'SSH Brute Force hujumi aniqlandi — ko\'p marta noto\'g\'ri parol',
+        'port_scan':   'Port Scan hujumi aniqlandi — tarmoq razvedkasi',
+        'anomaly':     'Anomal faollik aniqlandi — noodatiy jarayon yoki ulanish',
+        'normal':      'Normal trafik — tahdid aniqlanmadi',
+    }
+    windows = LogWindow.objects.order_by('-timestamp')[:limit]
     entries = []
-    for log in recent_logs:
-        level = 'error' if log.severity in ('critical', 'high') else 'warn' if log.severity == 'medium' else 'info'
+    for w in windows:
         entries.append({
-            'id': log.id,
-            'level': level,
-            'message': f'{log.get_threat_type_display()} aniqlandi - {log.get_severity_display()}',
-            'timestamp': log.created_at.isoformat(),
-            'ip': log.ip_address,
+            'id': w.id,
+            'level': _LEVEL.get(w.label, 'info'),
+            'message': _MSG.get(w.label, w.label),
+            'timestamp': w.timestamp.isoformat(),
+            'ip': '172.19.0.4',
+            'label': w.label,
+            'failed_logins': w.failed_logins,
+            'tcp_connections': w.tcp_connections,
+            'source': w.source,
         })
     return entries
 
@@ -1404,54 +1414,63 @@ def get_all_mitre_mappings() -> list:
 
 
 def run_correlation_engine() -> list:
-    """Korrelyatsiya qoidalari asosida yangi intsidentlarni aniqlaydi va saqlaydi."""
-    from .models import ThreatLog, Incident
+    """LogWindow asosida korrelyatsiya: brute_force + port_scan → APT."""
+    from lab.models import LogWindow
+    from .models import Incident
 
     now = timezone.now()
     new_incidents = []
 
-    for rule in CORRELATION_RULES:
-        max_window = max(c['window_minutes'] for c in rule['conditions'])
-        all_met = True
-        involved_ips = set()
+    # Qoida 1: so'nggi 60 daqiqada brute_force + port_scan → APT
+    window_start = now - timezone.timedelta(minutes=60)
+    bf_count = LogWindow.objects.filter(label='brute_force', timestamp__gte=window_start).count()
+    ps_count = LogWindow.objects.filter(label='port_scan',   timestamp__gte=window_start).count()
 
-        for condition in rule['conditions']:
-            window_start = now - timezone.timedelta(minutes=condition['window_minutes'])
-            logs = ThreatLog.objects.filter(threat_type=condition['threat_type'], created_at__gte=window_start)
-            if logs.count() < condition['min_count']:
-                all_met = False
-                break
-            for log in logs.values('ip_address'):
-                involved_ips.add(log['ip_address'])
+    if bf_count >= 2 and ps_count >= 1:
+        if not Incident.objects.filter(rule_name='APT_COMBO', created_at__gte=now - timezone.timedelta(minutes=15)).exists():
+            inc = Incident.objects.create(
+                title='APT Hujum Kombinatsiyasi',
+                description=f'So\'nggi 60 daqiqada {bf_count} ta Brute Force + {ps_count} ta Port Scan aniqlandi. APT hujumi ehtimoli yuqori.',
+                rule_name='APT_COMBO',
+                severity='critical',
+                threat_type='apt',
+                involved_ips=['172.19.0.4'],
+            )
+            new_incidents.append({'id': inc.id, 'title': inc.title, 'description': inc.description,
+                                   'severity': inc.severity, 'threat_type': inc.threat_type,
+                                   'involved_ips': inc.involved_ips, 'created_at': inc.created_at.isoformat()})
 
-        if not all_met:
-            continue
+    # Qoida 2: so'nggi 30 daqiqada 5+ brute_force → Persistent Brute Force
+    bf_recent = LogWindow.objects.filter(label='brute_force', timestamp__gte=now - timezone.timedelta(minutes=30)).count()
+    if bf_recent >= 5:
+        if not Incident.objects.filter(rule_name='PERSISTENT_BF', created_at__gte=now - timezone.timedelta(minutes=15)).exists():
+            inc = Incident.objects.create(
+                title='Doimiy Brute Force Hujumi',
+                description=f'30 daqiqada {bf_recent} ta brute force oynasi aniqlandi. Maqsadli hujum ehtimoli bor.',
+                rule_name='PERSISTENT_BF',
+                severity='high',
+                threat_type='brute_force',
+                involved_ips=['172.19.0.4'],
+            )
+            new_incidents.append({'id': inc.id, 'title': inc.title, 'description': inc.description,
+                                   'severity': inc.severity, 'threat_type': inc.threat_type,
+                                   'involved_ips': inc.involved_ips, 'created_at': inc.created_at.isoformat()})
 
-        already_exists = Incident.objects.filter(
-            rule_name=rule['name'],
-            created_at__gte=now - timezone.timedelta(hours=2),
-        ).exists()
-
-        if already_exists:
-            continue
-
-        incident = Incident.objects.create(
-            title=rule['name'],
-            description=rule['description'],
-            rule_name=rule['name'],
-            severity=rule['severity'],
-            threat_type=rule['result_threat'],
-            involved_ips=list(involved_ips)[:20],
-        )
-        new_incidents.append({
-            'id': incident.id,
-            'title': incident.title,
-            'description': incident.description,
-            'severity': incident.severity,
-            'threat_type': incident.threat_type,
-            'involved_ips': incident.involved_ips,
-            'created_at': incident.created_at.isoformat(),
-        })
+    # Qoida 3: anomaly aniqlansa → Noma'lum tahdid
+    anom_count = LogWindow.objects.filter(label='anomaly', timestamp__gte=now - timezone.timedelta(minutes=60)).count()
+    if anom_count >= 2:
+        if not Incident.objects.filter(rule_name='ANOMALY_CLUSTER', created_at__gte=now - timezone.timedelta(minutes=15)).exists():
+            inc = Incident.objects.create(
+                title="Anomal Faollik To'plami",
+                description=f'60 daqiqada {anom_count} ta anomaliya aniqlandi. Noma\'lum hujum vektori tekshirilsin.',
+                rule_name='ANOMALY_CLUSTER',
+                severity='high',
+                threat_type='anomaly',
+                involved_ips=['172.19.0.4'],
+            )
+            new_incidents.append({'id': inc.id, 'title': inc.title, 'description': inc.description,
+                                   'severity': inc.severity, 'threat_type': inc.threat_type,
+                                   'involved_ips': inc.involved_ips, 'created_at': inc.created_at.isoformat()})
 
     return new_incidents
 
@@ -1627,52 +1646,59 @@ def get_autoencoder_score(feature_array: np.ndarray) -> dict:
 
 
 def export_threats_csv() -> str:
-    """ThreatLog yozuvlarini CSV formatda qaytaradi."""
-    from .models import ThreatLog
+    """LogWindow yozuvlarini CSV formatda qaytaradi."""
+    from lab.models import LogWindow
 
+    _SEV = {'brute_force': 'critical', 'port_scan': 'high', 'anomaly': 'high', 'normal': 'low'}
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['ID', 'IP Manzil', 'Tahdid Turi', 'Jiddiylik', 'Ehtimollik', 'Qurilma', 'Algoritm', 'Bloklangan', 'Sana'])
+    writer.writerow(['ID', 'IP Manzil', 'Tahdid Turi', 'Jiddiylik', 'Muvaffaqiyatsiz_Login',
+                     'TCP_Ulanish', 'Algoritm', 'Manba', 'Sana'])
 
-    for log in ThreatLog.objects.order_by('-created_at')[:500]:
+    for w in LogWindow.objects.order_by('-timestamp')[:500]:
         writer.writerow([
-            log.id,
-            log.ip_address,
-            log.threat_type,
-            log.severity,
-            round(log.probability, 3),
-            log.device_name,
-            log.algorithm,
-            'Ha' if log.is_blocked else "Yo'q",
-            log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            w.id,
+            '172.19.0.4',
+            w.label,
+            _SEV.get(w.label, 'low'),
+            w.failed_logins,
+            w.tcp_connections,
+            'Random Forest + Neural Net + Isolation Forest',
+            w.source,
+            w.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
         ])
 
     return output.getvalue()
 
 
 def export_threats_json() -> list:
-    """ThreatLog yozuvlarini JSON formatda qaytaradi."""
-    from .models import ThreatLog
+    """LogWindow yozuvlarini JSON formatda qaytaradi."""
+    from lab.models import LogWindow
 
+    _SEV = {'brute_force': 'critical', 'port_scan': 'high', 'anomaly': 'high', 'normal': 'low'}
     return [
         {
-            'id': log.id,
-            'ip_address': log.ip_address,
-            'threat_type': log.threat_type,
-            'severity': log.severity,
-            'probability': round(log.probability, 3),
-            'device_name': log.device_name,
-            'algorithm': log.algorithm,
-            'is_blocked': log.is_blocked,
-            'created_at': log.created_at.isoformat(),
+            'id': w.id,
+            'ip_address': '172.19.0.4',
+            'threat_type': w.label,
+            'severity': _SEV.get(w.label, 'low'),
+            'failed_logins': w.failed_logins,
+            'success_logins': w.success_logins,
+            'tcp_connections': w.tcp_connections,
+            'running_processes': w.running_processes,
+            'algorithm': 'Random Forest + Neural Net + Isolation Forest',
+            'source': w.source,
+            'created_at': w.timestamp.isoformat(),
         }
-        for log in ThreatLog.objects.order_by('-created_at')[:500]
+        for w in LogWindow.objects.order_by('-timestamp')[:500]
     ]
 
 
 def generate_pdf_report() -> bytes:
-    """Tahdid hisobotini PDF formatida yaratadi."""
-    from .models import ThreatLog, BlockedIP
+    """Tahdid hisobotini PDF formatida yaratadi (LogWindow asosida)."""
+    from lab.models import LogWindow, PredictionLog
+    from .models import BlockedIP
+    from django.db.models import Count as DCount
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
@@ -1681,6 +1707,8 @@ def generate_pdf_report() -> bytes:
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     except ImportError:
         return b''
+
+    _SEV = {'brute_force': 'KRITIK', 'port_scan': 'YUQORI', 'anomaly': 'YUQORI', 'normal': 'PAST'}
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2 * cm, bottomMargin=2 * cm)
@@ -1692,23 +1720,32 @@ def generate_pdf_report() -> bytes:
     story.append(Paragraph(f"Sana: {timezone.now().strftime('%Y-%m-%d %H:%M')} UTC", styles['Normal']))
     story.append(Spacer(1, 0.6 * cm))
 
-    logs = ThreatLog.objects.order_by('-created_at')[:20]
-    total = ThreatLog.objects.count()
+    label_dist = dict(LogWindow.objects.values('label').annotate(c=DCount('id')).values_list('label', 'c'))
+    total = sum(label_dist.values())
+    threat_count = sum(v for k, v in label_dist.items() if k != 'normal')
     blocked_count = BlockedIP.objects.filter(is_active=True).count()
-    critical_count = ThreatLog.objects.filter(severity='critical').count()
-    try:
-        from .models import Incident
-        incident_count = Incident.objects.count()
-    except Exception:
-        incident_count = 0
 
-    story.append(Paragraph('Umumiy Ko\'rsatkichlar', styles['Heading2']))
+    try:
+        from lab.multi_trainer import models_status
+        mst = models_status()
+        rf_acc = round((mst.get('rf', {}).get('accuracy') or 0) * 100, 1)
+        nn_acc = round((mst.get('nn', {}).get('accuracy') or 0) * 100, 1)
+        iso_acc = round((mst.get('iso', {}).get('accuracy') or 0) * 100, 1)
+    except Exception:
+        rf_acc = nn_acc = iso_acc = 0.0
+
+    story.append(Paragraph("Umumiy Ko'rsatkichlar", styles['Heading2']))
     summary_data = [
-        ['Ko\'rsatkich', 'Qiymat'],
-        ['Jami tahdidlar', str(total)],
+        ["Ko'rsatkich", 'Qiymat'],
+        ['Jami log oynalari', str(total)],
+        ['Tahdid aniqlangan', str(threat_count)],
+        ['Brute Force', str(label_dist.get('brute_force', 0))],
+        ['Port Scan', str(label_dist.get('port_scan', 0))],
+        ['Anomaliya', str(label_dist.get('anomaly', 0))],
         ['Bloklangan IP lar', str(blocked_count)],
-        ['Kritik tahdidlar', str(critical_count)],
-        ['Intsidentlar', str(incident_count)],
+        ['RF Aniqligi', f'{rf_acc}%'],
+        ['NN Aniqligi', f'{nn_acc}%'],
+        ['Isolation Forest Aniqligi', f'{iso_acc}%'],
     ]
     summary_table = Table(summary_data, colWidths=[10 * cm, 6 * cm])
     summary_table.setStyle(TableStyle([
@@ -1723,17 +1760,20 @@ def generate_pdf_report() -> bytes:
     story.append(summary_table)
     story.append(Spacer(1, 0.6 * cm))
 
-    story.append(Paragraph('So\'nggi 20 ta Tahdid', styles['Heading2']))
-    log_data = [['IP', 'Tahdid', 'Jiddiylik', 'Ehtimol', 'Sana']]
-    for log in logs:
+    story.append(Paragraph("So'nggi 20 ta Tahdid Log Oynasi", styles['Heading2']))
+    recent = LogWindow.objects.exclude(label='normal').order_by('-timestamp')[:20]
+    log_data = [['IP', 'Tahdid Turi', 'Jiddiylik', 'Muvaffaqiyatsiz Login', 'Sana']]
+    for w in recent:
         log_data.append([
-            log.ip_address,
-            log.threat_type.upper(),
-            log.severity.upper(),
-            f'{round(log.probability * 100, 1)}%',
-            log.created_at.strftime('%m/%d %H:%M'),
+            '172.19.0.4',
+            w.label.upper().replace('_', ' '),
+            _SEV.get(w.label, 'NOMA\'LUM'),
+            str(w.failed_logins),
+            w.timestamp.strftime('%m/%d %H:%M'),
         ])
-    log_table = Table(log_data, colWidths=[4 * cm, 3.5 * cm, 3 * cm, 2.5 * cm, 3.5 * cm])
+    if len(log_data) == 1:
+        log_data.append(['-', '-', '-', '-', '-'])
+    log_table = Table(log_data, colWidths=[3.5 * cm, 4 * cm, 3 * cm, 3.5 * cm, 2.5 * cm])
     log_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a3a5c')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
